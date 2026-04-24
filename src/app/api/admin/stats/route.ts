@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
     // if (auth instanceof Response) return auth
     // if (auth.role !== 'ADMIN') return errorResponse('Forbidden', 403)
 
-    const stats = await withCache('admin:stats', CACHE_TTL.short, async () => {
+    const stats = await withCache('admin:stats', 60 * 5, async () => {
       const now = new Date()
       const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
       const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
