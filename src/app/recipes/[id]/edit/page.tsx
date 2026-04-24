@@ -17,6 +17,7 @@ interface StepField {
   contentEn: string
   titleZh?: string
   titleEn?: string
+  image?: string
   durationMin?: number | string
   stepNumber?: number
 }
@@ -170,6 +171,7 @@ export default function EditRecipePage() {
                 titleEn: s.titleEn ?? '',
                 contentZh: s.contentZh ?? '',
                 contentEn: s.contentEn ?? '',
+                image: s.image ?? '',
                 durationMin: s.durationMin ?? '',
               }))
             : [{ contentZh: '', contentEn: '' }],
@@ -214,6 +216,22 @@ export default function EditRecipePage() {
         calories: toIntOrNull(values.calories),
         coverImage: values.coverImage || null,
         isPublished: values.isPublished,
+        steps: values.steps.map((s, i) => ({
+          stepNumber: i + 1,
+          titleZh: s.titleZh || undefined,
+          titleEn: s.titleEn || undefined,
+          contentZh: s.contentZh,
+          contentEn: s.contentEn,
+          image: s.image || '',
+          durationMin: toIntOrNull(s.durationMin) ?? undefined,
+        })),
+        ingredients: values.ingredients.map((ing) => ({
+          nameZh: ing.nameZh,
+          nameEn: ing.nameEn,
+          amount: ing.amount,
+          unit: ing.unit || undefined,
+          isOptional: !!ing.isOptional,
+        })),
       }
 
       const res = await fetch(`/api/recipes/${recipeId}`, {
@@ -539,6 +557,15 @@ export default function EditRecipePage() {
                       rows={3}
                       placeholder="Describe this step in detail..."
                     />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label>步骤图片 URL（可选）</Label>
+                    <Input
+                      {...register(`steps.${i}.image`)}
+                      placeholder="https://images.unsplash.com/..."
+                      type="url"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">编辑时会自动回填已有步骤图片，留空表示不设置</p>
                   </div>
                 </div>
               </div>

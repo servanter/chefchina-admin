@@ -25,6 +25,22 @@ const UpdateSchema = z.object({
   sugar: z.number().nonnegative().optional().nullable(),
   isPublished: z.boolean().optional(),
   categoryId: z.string().optional(),
+  steps: z.array(z.object({
+    stepNumber: z.number().int().positive(),
+    titleEn: z.string().optional(),
+    titleZh: z.string().optional(),
+    contentEn: z.string().min(1),
+    contentZh: z.string().min(1),
+    image: z.string().url().optional().or(z.literal('')).transform((v) => v || undefined),
+    durationMin: z.number().int().optional().nullable(),
+  })).optional(),
+  ingredients: z.array(z.object({
+    nameEn: z.string().min(1),
+    nameZh: z.string().min(1),
+    amount: z.string().min(1),
+    unit: z.string().optional(),
+    isOptional: z.boolean().default(false),
+  })).optional(),
 })
 
 // GET /api/recipes/[id]
@@ -96,10 +112,28 @@ export async function PATCH(
 
     const body = await req.json()
     const data = UpdateSchema.parse(body)
+    const { steps, ingredients, ...recipeData } = data
 
     const recipe = await prisma.recipe.update({
       where: { id },
-      data,
+      data: {
+        ...recipeData,
+        ...(steps ? {
+          steps: {
+            deleteMany: {},
+            create: steps.map((step) => ({
+              ...step,
+              durationMin: step.durationMin ?? undefined,
+            })),
+          },
+        } : {}),
+        ...(ingredients ? {
+          ingredients: {
+            deleteMany: {},
+            create: ingredients,
+          },
+        } : {}),
+      },
       include: {
         category: true,
         author: { select: { id: true, name: true, avatar: true } },
