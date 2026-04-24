@@ -3,14 +3,15 @@ import { prisma } from '@/lib/prisma'
 import { successResponse, handleError, paginate } from '@/lib/api'
 
 // GET /api/users/[id]/followers - 获取粉丝列表
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { searchParams } = new URL(req.url)
     const page = Number(searchParams.get('page') || 1)
     const pageSize = Number(searchParams.get('pageSize') || 20)
     const { take, skip } = paginate(page, pageSize)
 
-    const userId = params.id
+    const { id } = await params
+    const userId = id
 
     const [followers, total] = await Promise.all([
       prisma.follow.findMany({

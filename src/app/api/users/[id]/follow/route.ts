@@ -4,12 +4,13 @@ import { successResponse, errorResponse, handleError } from '@/lib/api'
 import { requireAuth } from '@/lib/auth-guard'
 
 // POST /api/users/[id]/follow - 关注用户
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = requireAuth(req)
     if (auth instanceof Response) return auth
     const followerId = auth.sub
-    const followingId = params.id
+    const { id } = await params
+    const followingId = id
 
     // 不能关注自己
     if (followerId === followingId) {
@@ -44,12 +45,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 }
 
 // DELETE /api/users/[id]/follow - 取消关注
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = requireAuth(req)
     if (auth instanceof Response) return auth
     const followerId = auth.sub
-    const followingId = params.id
+    const { id } = await params
+    const followingId = id
 
     await prisma.follow.deleteMany({
       where: {
