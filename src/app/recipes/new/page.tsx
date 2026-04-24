@@ -16,7 +16,8 @@ interface StepField {
   contentEn: string
   titleZh?: string
   titleEn?: string
-  durationMin?: number
+  image?: string
+  durationMin?: number | string
 }
 
 interface IngredientField {
@@ -153,6 +154,7 @@ export default function NewRecipePage() {
         steps: values.steps.map((s, i) => ({
           ...s,
           stepNumber: i + 1,
+          image: s.image || undefined,
           durationMin: s.durationMin ? Number(s.durationMin) : undefined,
         })),
         ingredients: values.ingredients.map((ing) => ({
@@ -452,6 +454,15 @@ export default function NewRecipePage() {
                       rows={3}
                       placeholder="Describe this step in detail..."
                     />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label>步骤图片 URL（可选）</Label>
+                    <Input
+                      {...register(`steps.${i}.image`)}
+                      placeholder="https://images.unsplash.com/..."
+                      type="url"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">每个步骤可单独配置一张图片，留空即可</p>
                   </div>
                 </div>
               </div>
