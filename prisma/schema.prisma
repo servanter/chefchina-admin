@@ -75,6 +75,12 @@ model Recipe {
   cookTimeMin   Int?
   servings      Int?
   calories      Int?
+  protein       Float?       // 蛋白质(g)
+  fat           Float?       // 脂肪(g)
+  carbs         Float?       // 碳水化合物(g)
+  fiber         Float?       // 膳食纤维(g)
+  sodium        Float?       // 钠(mg)
+  sugar         Float?       // 糖(g)
   isPublished   Boolean      @default(false)
   viewCount     Int          @default(0)
   authorId      String

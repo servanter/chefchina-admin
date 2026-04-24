@@ -16,6 +16,13 @@ const UpdateSchema = z.object({
   cookTimeMin: z.number().int().positive().optional().nullable(),
   servings: z.number().int().positive().optional().nullable(),
   calories: z.number().int().nonnegative().optional().nullable(),
+  // 营养成分字段 (REQ-4.4)
+  protein: z.number().nonnegative().optional().nullable(),
+  fat: z.number().nonnegative().optional().nullable(),
+  carbs: z.number().nonnegative().optional().nullable(),
+  fiber: z.number().nonnegative().optional().nullable(),
+  sodium: z.number().nonnegative().optional().nullable(),
+  sugar: z.number().nonnegative().optional().nullable(),
   isPublished: z.boolean().optional(),
   categoryId: z.string().optional(),
 })

@@ -16,6 +16,13 @@ const RecipeCreateSchema = z.object({
   cookTimeMin: z.number().int().positive().optional().nullable(),
   servings: z.number().int().positive().optional().nullable(),
   calories: z.number().int().nonnegative().optional().nullable(),
+  // 营养成分字段 (REQ-4.4)
+  protein: z.number().nonnegative().optional().nullable(),
+  fat: z.number().nonnegative().optional().nullable(),
+  carbs: z.number().nonnegative().optional().nullable(),
+  fiber: z.number().nonnegative().optional().nullable(),
+  sodium: z.number().nonnegative().optional().nullable(),
+  sugar: z.number().nonnegative().optional().nullable(),
   isPublished: z.boolean().default(false),
   // authorId 由服务端从 token 注入，不再信任 body 传入的值
   categoryId: z.string(),
