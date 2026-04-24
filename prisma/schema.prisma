@@ -32,6 +32,8 @@ model User {
   likes         Like[]
   favorites     Favorite[]
   notifications Notification[]
+  following     Follow[]      @relation("UserFollowing")
+  followers     Follow[]      @relation("UserFollowers")
 
   @@map("users")
 }
@@ -174,9 +176,10 @@ model Comment {
   id        String   @id @default(cuid())
   content   String
   rating    Int?     // 1-5 星
+  images    String[] // 评论图片数组（存储 base64 或 URL）
   recipeId  String
   userId    String
-  parentId  String?
+  parentId  String?  // 楼中楼回复（最多 2 层）
   isVisible Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -268,6 +271,24 @@ model ShareLog {
 
   @@index([recipeId])
   @@map("share_logs")
+}
+
+// ─────────────────────────────────────────
+// 用户关注
+// ─────────────────────────────────────────
+model Follow {
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower    User     @relation("UserFollowing", fields: [followerId], references: [id], onDelete: Cascade)
+  following   User     @relation("UserFollowers", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@id([followerId, followingId])
+  @@unique([followerId, followingId]) // 防止重复关注
+  @@index([followerId])
+  @@index([followingId])
+  @@map("follows")
 }
 
 // ─────────────────────────────────────────

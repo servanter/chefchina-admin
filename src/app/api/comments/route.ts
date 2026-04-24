@@ -9,6 +9,7 @@ import { z } from 'zod'
 const CommentSchema = z.object({
   content: z.string().min(1).max(1000),
   rating: z.number().int().min(1).max(5).optional(),
+  images: z.array(z.string()).max(9).optional(), // 最多 9 张图片
   recipeId: z.string(),
   userId: z.string().optional(),
   parentId: z.string().optional(),
@@ -39,6 +40,7 @@ export async function GET(req: NextRequest) {
           include: {
             user: { select: { id: true, name: true, avatar: true } },
             replies: {
+              where: showAll ? {} : { isVisible: true },
               include: { user: { select: { id: true, name: true, avatar: true } } },
               orderBy: { createdAt: 'asc' },
             },
