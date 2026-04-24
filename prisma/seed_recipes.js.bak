@@ -6,7 +6,8 @@ process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 const { Client } = require('pg');
 
 const client = new Client({
-  connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/chefchina',
+  connectionString:
+    'postgres://postgres.mlzyxmndtertlwqbqfjr:qAOZSvpOuLF08Er1@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres',
   connectionTimeoutMillis: 20000,
 });
 
@@ -416,8 +417,8 @@ async function seed() {
     // Insert recipe
     await client.query(
       `INSERT INTO recipes
-        (id,"titleEn","titleZh","descriptionEn","descriptionZh","coverImage",difficulty,"cookTimeMin",servings,"isPublished","authorId","categoryId","createdAt","updatedAt")
-       VALUES ($1,$2,$3,$4,$5,$6,$7::"Difficulty",$8,$9,true,'usr_admin',$10,NOW(),NOW())
+        (id,"titleEn","titleZh","descriptionEn","descriptionZh","coverImage",difficulty,"cookTimeMin",servings,"isPublished","authorId","categoryId")
+       VALUES ($1,$2,$3,$4,$5,$6,$7::"Difficulty",$8,$9,true,'usr_admin',$10)
        ON CONFLICT (id) DO NOTHING`,
       [r.id, r.titleEn, r.titleZh, r.descriptionEn, r.descriptionZh,
        r.cover, r.difficulty, r.cookTime, r.servings, r.cat]
@@ -442,8 +443,8 @@ async function seed() {
       const stepId = `${r.id}_step_${String(i + 1).padStart(2, '0')}`;
       await client.query(
         `INSERT INTO recipe_steps
-          (id,"recipeId","stepNumber","titleEn","titleZh","contentEn","contentZh",image,"durationMin","createdAt")
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,NOW()) ON CONFLICT (id) DO NOTHING`,
+          (id,"recipeId","stepNumber","titleEn","titleZh","contentEn","contentZh",image,"durationMin")
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (id) DO NOTHING`,
         [stepId, r.id, parseInt(num), titleEn, titleZh, contentEn, contentZh,
          image || null, duration || null]
       );

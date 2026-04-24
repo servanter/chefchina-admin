@@ -22,7 +22,15 @@ export async function GET(
     const user = await prisma.user.findUnique({
       where: { id },
       include: {
-        _count: { select: { recipes: true, comments: true, favorites: true } },
+        _count: { 
+          select: { 
+            recipes: true, 
+            comments: true, 
+            favorites: true,
+            followers: true,
+            following: true,
+          } 
+        },
       },
     })
     if (!user) return errorResponse('User not found', 404)
@@ -51,7 +59,15 @@ export async function PATCH(
       where: { id },
       data,
       include: {
-        _count: { select: { recipes: true, comments: true, favorites: true } },
+        _count: { 
+          select: { 
+            recipes: true, 
+            comments: true, 
+            favorites: true,
+            followers: true,
+            following: true,
+          } 
+        },
       },
     })
     return successResponse(user)
