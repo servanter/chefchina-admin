@@ -75,26 +75,113 @@ export async function GET(req: NextRequest) {
         ...(tagId && { tags: { some: { tagId } } }),
       }
 
-      const [recipes, total] = await Promise.all([
-        prisma.recipe.findMany({
-          where,
-          take,
-          skip,
-          orderBy:
-            sort === 'popular' || sort === 'hot'
-              ? [{ viewCount: 'desc' }, { createdAt: 'desc' }]
-              : { createdAt: 'desc' },
-          include: {
-            category: { select: { id: true, nameEn: true, nameZh: true, slug: true } },
-            author: { select: { id: true, name: true, avatar: true } },
-            tags: { include: { tag: true } },
-            _count: { select: { likes: true, comments: true, favorites: true } },
-          },
-        }),
-        prisma.recipe.count({ where }),
-      ])
+      const orderBy =
+        sort === 'popular' || sort === 'hot'
+          ? [{ viewCount: 'desc' as const }, { createdAt: 'desc' as const }]
+          : { createdAt: 'desc' as const }
 
-      // Compute avg ratings for all returned recipes
+      const include = {
+        category: { select: { id: true, nameEn: true, nameZh: true, slug: true } },
+        author: { select: { id: true, name: true, avatar: true } },
+        tags: { include: { tag: true } },
+        _count: { select: { likes: true, comments: true, favorites: true } },
+      }
+
+      const total = await prisma.recipe.count({ where })
+
+      if (sort === 'recommended') {
+        const rankedRecipes = await prisma.$queryRaw<Array<{ id: string }>>`
+          SELECT r.id
+          FROM "recipes" r
+          LEFT JOIN (
+            SELECT
+              c."recipeId",
+              COALESCE(AVG(c.rating), 0) AS "avgRating",
+              COUNT(c.rating) AS "ratingsCount"
+            FROM "comments" c
+            WHERE c.rating IS NOT NULL
+            GROUP BY c."recipeId"
+          ) ratings ON ratings."recipeId" = r.id
+          WHERE r."isPublished" = ${published}
+            AND (${categoryId}::text IS NULL OR r."categoryId" = ${categoryId})
+            AND (${difficulty}::text IS NULL OR r."difficulty" = ${difficulty}::"Difficulty")
+            AND (
+              ${search}::text IS NULL
+              OR r."titleEn" ILIKE ${search ? `%${search}%` : null}
+              OR r."titleZh" ILIKE ${search ? `%${search}%` : null}
+            )
+            AND (
+              ${tagId}::text IS NULL
+              OR EXISTS (
+                SELECT 1 FROM "recipe_tags" rt
+                WHERE rt."recipeId" = r.id AND rt."tagId" = ${tagId}
+              )
+            )
+          ORDER BY
+            (
+              COALESCE(r."viewCount", 0) * 1 +
+              COALESCE((
+                SELECT COUNT(*) FROM "favorites" f WHERE f."recipeId" = r.id
+              ), 0) * 8 +
+              COALESCE((
+                SELECT COUNT(*) FROM "likes" l WHERE l."recipeId" = r.id
+              ), 0) * 5 +
+              COALESCE((
+                SELECT COUNT(*) FROM "comments" c2 WHERE c2."recipeId" = r.id
+              ), 0) * 6 +
+              COALESCE(ratings."avgRating", 0) * 10 +
+              COALESCE(ratings."ratingsCount", 0) * 2
+            ) DESC,
+            r."createdAt" DESC
+          LIMIT ${take} OFFSET ${skip}
+        `
+
+        const rankedIds = rankedRecipes.map((item) => item.id)
+        const recipes = rankedIds.length
+          ? await prisma.recipe.findMany({
+              where: { id: { in: rankedIds } },
+              include,
+            })
+          : []
+
+        const ratingStats = rankedIds.length > 0
+          ? await prisma.comment.groupBy({
+              by: ['recipeId'],
+              _avg: { rating: true },
+              _count: { rating: true },
+              where: { recipeId: { in: rankedIds }, rating: { not: null } },
+            })
+          : []
+
+        const ratingMap = new Map(
+          ratingStats.map((s) => [s.recipeId, { avg: s._avg.rating ?? 0, count: s._count.rating }])
+        )
+        const recipeMap = new Map(recipes.map((recipe) => [recipe.id, recipe]))
+
+        return {
+          recipes: rankedIds
+            .map((id) => {
+              const recipe = recipeMap.get(id)
+              if (!recipe) return null
+              return {
+                ...recipe,
+                avgRating: ratingMap.get(id)?.avg ?? 0,
+                ratingsCount: ratingMap.get(id)?.count ?? 0,
+              }
+            })
+            .filter(Boolean),
+          pagination: { page, pageSize: take, total, totalPages: Math.ceil(total / take) },
+        }
+      }
+
+      const recipes = await prisma.recipe.findMany({
+        where,
+        take,
+        skip,
+        orderBy,
+        include,
+      })
+
       const recipeIds = recipes.map((r) => r.id)
       const ratingStats = recipeIds.length > 0
         ? await prisma.comment.groupBy({
@@ -109,28 +196,12 @@ export async function GET(req: NextRequest) {
         ratingStats.map((s) => [s.recipeId, { avg: s._avg.rating ?? 0, count: s._count.rating }])
       )
 
-      const recipesWithRatings = recipes.map((r) => ({
-        ...r,
-        avgRating: ratingMap.get(r.id)?.avg ?? 0,
-        ratingsCount: ratingMap.get(r.id)?.count ?? 0,
-      }))
-
-      const sortedRecipes =
-        sort === 'recommended'
-          ? [...recipesWithRatings].sort((a, b) => {
-              const score = (item: typeof a) =>
-                (item.viewCount ?? 0) * 1 +
-                (item._count?.favorites ?? 0) * 8 +
-                (item._count?.likes ?? 0) * 5 +
-                (item._count?.comments ?? 0) * 6 +
-                (item.avgRating ?? 0) * 10 +
-                (item.ratingsCount ?? 0) * 2
-              return score(b) - score(a) || +new Date(b.createdAt) - +new Date(a.createdAt)
-            })
-          : recipesWithRatings
-
       return {
-        recipes: sortedRecipes,
+        recipes: recipes.map((r) => ({
+          ...r,
+          avgRating: ratingMap.get(r.id)?.avg ?? 0,
+          ratingsCount: ratingMap.get(r.id)?.count ?? 0,
+        })),
         pagination: { page, pageSize: take, total, totalPages: Math.ceil(total / take) },
       }
     })

@@ -9,6 +9,7 @@ const UpsertHistorySchema = z.object({
 })
 
 const DeleteHistorySchema = z.object({
+  historyId: z.string().min(1).optional(),
   recipeId: z.string().min(1).optional(),
   clearAll: z.boolean().optional(),
 })
@@ -24,29 +25,24 @@ export async function GET(req: NextRequest) {
     const { take, skip } = paginate(page, pageSize)
 
     const [items, total] = await Promise.all([
-      prisma.$queryRaw<Array<{
-        recipeId: string
-        viewedAt: Date
-      }>>`
-        SELECT "recipeId", MAX("createdAt") AS "viewedAt"
-        FROM "share_logs"
-        WHERE "userId" = ${auth.sub} AND "channel" = 'view_history'
-        GROUP BY "recipeId"
-        ORDER BY MAX("createdAt") DESC
-        LIMIT ${take} OFFSET ${skip}
-      `,
-      prisma.$queryRaw<Array<{ count: bigint | number }>>`
-        SELECT COUNT(*)::bigint AS count
-        FROM (
-          SELECT 1
-          FROM "share_logs"
-          WHERE "userId" = ${auth.sub} AND "channel" = 'view_history'
-          GROUP BY "recipeId"
-        ) t
-      `,
+      prisma.shareLog.findMany({
+        where: {
+          userId: auth.sub,
+          channel: 'view_history',
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take,
+        skip,
+      }),
+      prisma.shareLog.count({
+        where: {
+          userId: auth.sub,
+          channel: 'view_history',
+        },
+      }),
     ])
 
-    const recipeIds = items.map((item) => item.recipeId)
+    const recipeIds = Array.from(new Set(items.map((item) => item.recipeId)))
     const recipes = recipeIds.length
       ? await prisma.recipe.findMany({
           where: { id: { in: recipeIds } },
@@ -66,22 +62,21 @@ export async function GET(req: NextRequest) {
         if (!recipe) return null
         return {
           ...recipe,
-          viewedAt: item.viewedAt,
+          historyId: item.id,
+          viewedAt: item.createdAt,
           avgRating: 0,
           ratingsCount: 0,
         }
       })
       .filter(Boolean)
 
-    const totalValue = Number(total[0]?.count ?? 0)
-
     return successResponse({
       items: history,
       pagination: {
         page,
         pageSize: take,
-        total: totalValue,
-        totalPages: Math.max(1, Math.ceil(totalValue / take)),
+        total,
+        totalPages: Math.max(1, Math.ceil(total / take)),
       },
     })
   } catch (error) {
@@ -97,15 +92,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { recipeId } = UpsertHistorySchema.parse(body)
 
-    await prisma.shareLog.create({
+    const history = await prisma.shareLog.create({
       data: {
         userId: auth.sub,
         recipeId,
         channel: 'view_history',
       },
+      select: { id: true, recipeId: true, createdAt: true },
     })
 
-    return successResponse({ ok: true }, 201)
+    return successResponse({ ok: true, history }, 201)
   } catch (error) {
     return handleError(error)
   }
@@ -117,7 +113,7 @@ export async function DELETE(req: NextRequest) {
     if (auth instanceof Response) return auth
 
     const body = await req.json().catch(() => ({}))
-    const { recipeId, clearAll } = DeleteHistorySchema.parse(body)
+    const { historyId, recipeId, clearAll } = DeleteHistorySchema.parse(body)
 
     if (clearAll) {
       const result = await prisma.shareLog.deleteMany({
@@ -129,31 +125,43 @@ export async function DELETE(req: NextRequest) {
       return successResponse({ deleted: result.count })
     }
 
-    if (!recipeId) {
-      return successResponse({ deleted: 0 })
+    if (historyId) {
+      const result = await prisma.shareLog.deleteMany({
+        where: {
+          id: historyId,
+          userId: auth.sub,
+          channel: 'view_history',
+        },
+      })
+      return successResponse({ deleted: result.count })
     }
 
-    const latest = await prisma.shareLog.findFirst({
-      where: {
-        userId: auth.sub,
-        recipeId,
-        channel: 'view_history',
-      },
-      orderBy: { createdAt: 'desc' },
-      select: { id: true },
-    })
+    // 兼容旧客户端：如果还只传 recipeId，则只删最新一条，避免整道菜历史被批量清空。
+    if (recipeId) {
+      const latest = await prisma.shareLog.findFirst({
+        where: {
+          userId: auth.sub,
+          recipeId,
+          channel: 'view_history',
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        select: { id: true },
+      })
 
-    if (!latest) return successResponse({ deleted: 0 })
+      if (!latest) return successResponse({ deleted: 0 })
 
-    await prisma.shareLog.deleteMany({
-      where: {
-        userId: auth.sub,
-        recipeId,
-        channel: 'view_history',
-      },
-    })
+      const result = await prisma.shareLog.deleteMany({
+        where: {
+          id: latest.id,
+          userId: auth.sub,
+          channel: 'view_history',
+        },
+      })
 
-    return successResponse({ deleted: 1 })
+      return successResponse({ deleted: result.count })
+    }
+
+    return successResponse({ deleted: 0 })
   } catch (error) {
     return handleError(error)
   }
