@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
             title: `${fromUser} replied to your comment`,
             body: excerpt,
             actorId: userId,
-            resourceId: comment.id,
+            resourceId: parent.recipeId,
             payload: {
               recipeId: parent.recipeId,
               recipeTitle: recipe?.titleEn ?? '',

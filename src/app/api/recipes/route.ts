@@ -55,7 +55,7 @@ export async function GET(req: NextRequest) {
     const difficulty = searchParams.get('difficulty')
     const search = searchParams.get('search')
     const published = searchParams.get('published') !== 'false'
-    const sort = searchParams.get('sort') // 'hot' | undefined
+    const sort = searchParams.get('sort') // 'hot' | 'latest' | 'recommended' | 'popular'
     const tagId = searchParams.get('tagId')
 
     const cacheKey = `recipes:${page}:${pageSize}:${categoryId}:${difficulty}:${search}:${published}:${sort}:${tagId}`
@@ -80,9 +80,10 @@ export async function GET(req: NextRequest) {
           where,
           take,
           skip,
-          orderBy: sort === 'hot'
-            ? [{ viewCount: 'desc' }, { createdAt: 'desc' }]
-            : { createdAt: 'desc' },
+          orderBy:
+            sort === 'popular' || sort === 'hot'
+              ? [{ viewCount: 'desc' }, { createdAt: 'desc' }]
+              : { createdAt: 'desc' },
           include: {
             category: { select: { id: true, nameEn: true, nameZh: true, slug: true } },
             author: { select: { id: true, name: true, avatar: true } },
@@ -114,8 +115,22 @@ export async function GET(req: NextRequest) {
         ratingsCount: ratingMap.get(r.id)?.count ?? 0,
       }))
 
+      const sortedRecipes =
+        sort === 'recommended'
+          ? [...recipesWithRatings].sort((a, b) => {
+              const score = (item: typeof a) =>
+                (item.viewCount ?? 0) * 1 +
+                (item._count?.favorites ?? 0) * 8 +
+                (item._count?.likes ?? 0) * 5 +
+                (item._count?.comments ?? 0) * 6 +
+                (item.avgRating ?? 0) * 10 +
+                (item.ratingsCount ?? 0) * 2
+              return score(b) - score(a) || +new Date(b.createdAt) - +new Date(a.createdAt)
+            })
+          : recipesWithRatings
+
       return {
-        recipes: recipesWithRatings,
+        recipes: sortedRecipes,
         pagination: { page, pageSize: take, total, totalPages: Math.ceil(total / take) },
       }
     })
