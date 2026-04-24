@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────
+// 用户表
+// ─────────────────────────────────────────
+model User {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  name           String?
+  avatar         String?
+  bio            String?
+  role           UserRole @default(USER)
+  locale         String   @default("en")
+  expoPushToken  String?
+  passwordHash   String?
+  loginAttempts  Int      @default(0)
+  lockedUntil    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  recipes       Recipe[]
+  comments      Comment[]
+  likes         Like[]
+  favorites     Favorite[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+// ─────────────────────────────────────────
+// 菜谱分类
+// ─────────────────────────────────────────
+model Category {
+  id          String   @id @default(cuid())
+  nameEn      String
+  nameZh      String
+  slug        String   @unique
+  image       String?
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  recipes     Recipe[]
+
+  @@map("categories")
+}
+
+// ─────────────────────────────────────────
+// 菜谱主表
+// ─────────────────────────────────────────
+model Recipe {
+  id            String       @id @default(cuid())
+  titleEn       String
+  titleZh       String
+  descriptionEn String?
+  descriptionZh String?
+  coverImage    String?
+  // 需求 15：以下字段改为可选 —— 未填时 App 详情页不渲染对应 icon（见
+  // `chefchina-app/app/recipe/[id].tsx` 的 meta bar）。旧种子数据会保留原值，
+  // 新增菜谱可以在编辑表单中留空。
+  difficulty    Difficulty?
+  cookTimeMin   Int?
+  servings      Int?
+  calories      Int?
+  isPublished   Boolean      @default(false)
+  viewCount     Int          @default(0)
+  authorId      String
+  categoryId    String
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  author        User         @relation(fields: [authorId], references: [id])
+  category      Category     @relation(fields: [categoryId], references: [id])
+  steps         RecipeStep[]
+  ingredients   Ingredient[]
+  comments      Comment[]
+  likes         Like[]
+  favorites     Favorite[]
+  tags          RecipeTag[]
+
+  @@map("recipes")
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+// ─────────────────────────────────────────
+// 菜谱步骤
+// ─────────────────────────────────────────
+model RecipeStep {
+  id          String   @id @default(cuid())
+  recipeId    String
+  stepNumber  Int
+  titleEn     String?
+  titleZh     String?
+  contentEn   String
+  contentZh   String
+  image       String?
+  durationMin Int?
+  createdAt   DateTime @default(now())
+
+  recipe      Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@map("recipe_steps")
+}
+
+// ─────────────────────────────────────────
+// 食材
+// ─────────────────────────────────────────
+model Ingredient {
+  id         String   @id @default(cuid())
+  recipeId   String
+  nameEn     String
+  nameZh     String
+  amount     String
+  unit       String?
+  isOptional Boolean  @default(false)
+
+  recipe     Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@map("ingredients")
+}
+
+// ─────────────────────────────────────────
+// 标签
+// ─────────────────────────────────────────
+model Tag {
+  id      String      @id @default(cuid())
+  nameEn  String      @unique
+  nameZh  String
+
+  recipes RecipeTag[]
+
+  @@map("tags")
+}
+
+model RecipeTag {
+  recipeId String
+  tagId    String
+
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  tag      Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([recipeId, tagId])
+  @@map("recipe_tags")
+}
+
+// ─────────────────────────────────────────
+// 评论
+// ─────────────────────────────────────────
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  rating    Int?     // 1-5 星
+  recipeId  String
+  userId    String
+  parentId  String?
+  isVisible Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+
+  @@map("comments")
+}
+
+// ─────────────────────────────────────────
+// 点赞
+// ─────────────────────────────────────────
+model Like {
+  userId    String
+  recipeId  String
+  createdAt DateTime @default(now())
+
+  user      User   @relation(fields: [userId], references: [id])
+  recipe    Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, recipeId])
+  @@map("likes")
+}
+
+// ─────────────────────────────────────────
+// 收藏
+// ─────────────────────────────────────────
+model Favorite {
+  userId    String
+  recipeId  String
+  createdAt DateTime @default(now())
+
+  user      User   @relation(fields: [userId], references: [id])
+  recipe    Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, recipeId])
+  @@map("favorites")
+}
+
+// ─────────────────────────────────────────
+// 消息通知（站内信）
+// ─────────────────────────────────────────
+model Notification {
+  id         String           @id @default(cuid())
+  userId     String           // 接收者 recipient
+  type       NotificationType
+  title      String
+  body       String
+  payload    Json?            // { recipeId?, commentId?, fromUserId? ... }
+  // 结构化字段：用来做数据库层面的 24h 去重 (actorId, userId, type, resourceId)
+  actorId    String?          // 触发者（点赞者 / 回复者 / 收藏者 …）
+  resourceId String?          // 触发对应的资源 id（recipeId / commentId / …）
+  readAt     DateTime?
+  createdAt  DateTime         @default(now())
+
+  user       User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt])
+  // BUG-007 修复：删掉与下方 @@unique 完全重复的四元组 index —— unique index
+  // 本身就是 B-tree 索引，可以服务等值查询（actorId/userId/type/resourceId），
+  // 没必要再建一条普通 index 占写入成本。
+  // 24h dedup 由应用层 + DB unique 双保险，但 DB 不能带时间条件，只能保证
+  // "同一 actor/recipient/type/resource 不会同时存在两条"；应用侧 `hasRecentNotification`
+  // 再配合 24h 时间窗过滤即可。Upsert 失败也会被 createNotification 的 try/catch 吞掉。
+  @@unique([actorId, userId, type, resourceId])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  COMMENT_REPLY
+  RECIPE_LIKED
+  RECIPE_FAVORITED
+  SUBMISSION_APPROVED
+  SYSTEM
+}
+
+// ─────────────────────────────────────────
+// 分享日志
+// ─────────────────────────────────────────
+model ShareLog {
+  id        String   @id @default(cuid())
+  recipeId  String
+  userId    String?
+  channel   String?           // wechat / instagram / copy / other
+  createdAt DateTime @default(now())
+
+  @@index([recipeId])
+  @@map("share_logs")
+}
+
+// ─────────────────────────────────────────
+// 搜索日志（FEAT · /api/recipes/search 写入、/api/search/trending 聚合）
+// ─────────────────────────────────────────
+// 目前 admin 还有 Redis 版 /api/search-log + /api/search-trending（共用 ZSET），
+// 本模型是 SQL 版的持久化通道：
+//   - /api/recipes/search 落库：用户 userId（可空，匿名也记）+ normalize 过的 keyword
+//   - /api/search/trending 聚合：最近 7 天按 keyword 频次排序 + Redis 5 分钟缓存
+// Redis 版不会动（前向兼容）；两套并行直到老接口下线。
+model SearchLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  keyword   String
+  createdAt DateTime @default(now())
+
+  @@index([keyword, createdAt])
+  @@map("search_logs")
+}
