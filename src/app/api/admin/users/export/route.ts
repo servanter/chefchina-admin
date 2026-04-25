@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { handleError } from '@/lib/api'
+import { errorResponse, handleError } from '@/lib/api'
+import { requireAuth } from '@/lib/auth-guard'
 import { Prisma } from '@/generated/prisma'
 
 // Helper function to escape CSV fields
@@ -22,6 +23,10 @@ function formatDate(date: Date | null): string {
 // GET /api/admin/users/export — Export users to CSV
 export async function GET(req: NextRequest) {
   try {
+    const auth = requireAuth(req)
+    if (auth instanceof Response) return auth
+    if (auth.role !== 'ADMIN') return errorResponse('Forbidden', 403)
+
     const { searchParams } = new URL(req.url)
     
     // Filter parameters (same as list API)

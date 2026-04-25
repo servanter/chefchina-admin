@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleError, paginate } from '@/lib/api'
 import { requireAuth } from '@/lib/auth-guard'
+import { rateLimit, getClientIp } from '@/lib/rate-limit'
 
 const CreateReportSchema = z.object({
   targetType: z.enum(['RECIPE', 'COMMENT']),
@@ -17,16 +18,25 @@ export async function POST(req: NextRequest) {
     const auth = requireAuth(req)
     if (auth instanceof Response) return auth
 
+    // BUG-005: 举报接口限流 — 5 次/分钟（IP + userId 维度）
+    const ip = getClientIp(req)
+    const rlResult = await rateLimit(ip, { bucket: `report:${auth.sub}`, limit: 5, windowSeconds: 60 })
+    if (!rlResult.allowed) {
+      return errorResponse(`Too many reports. Please try again in ${rlResult.retryAfter} seconds.`, 429)
+    }
+
     const body = await req.json()
     const data = CreateReportSchema.parse(body)
 
-    // 校验目标存在性
+    // 校验目标存在性 + 自举报拦截
     if (data.targetType === 'RECIPE') {
-      const recipe = await prisma.recipe.findUnique({ where: { id: data.targetId }, select: { id: true } })
+      const recipe = await prisma.recipe.findUnique({ where: { id: data.targetId }, select: { id: true, authorId: true } })
       if (!recipe) return errorResponse('Recipe not found', 404)
+      if (recipe.authorId === auth.sub) return errorResponse('Cannot report your own content', 400)
     } else {
-      const comment = await prisma.comment.findUnique({ where: { id: data.targetId }, select: { id: true } })
+      const comment = await prisma.comment.findUnique({ where: { id: data.targetId }, select: { id: true, userId: true } })
       if (!comment) return errorResponse('Comment not found', 404)
+      if (comment.userId === auth.sub) return errorResponse('Cannot report your own content', 400)
     }
 
     // 防止重复举报（同一人对同一目标只能举报一次）
