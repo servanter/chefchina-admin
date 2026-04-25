@@ -38,6 +38,9 @@ model User {
   following     Follow[]      @relation("UserFollowing")
   followers     Follow[]      @relation("UserFollowers")
   reports       Report[]
+  level         Int          @default(1)  // 1-5
+  xp            Int          @default(0)  // 经验值
+  badges        UserBadge[]
 
   @@map("users")
 }
@@ -355,4 +358,39 @@ enum ReportStatus {
   REVIEWED
   RESOLVED
   DISMISSED
+}
+
+// ─────────────────────────────────────────
+// 成就徽章
+// ─────────────────────────────────────────
+model Badge {
+  id        String      @id @default(cuid())
+  key       String      @unique          // 如 "first_recipe", "10_likes"
+  nameEn    String
+  nameZh    String
+  descEn    String
+  descZh    String
+  icon      String                        // emoji 或图标名
+  category  String                        // "cooking", "social", "streak", "milestone"
+  threshold Int                           // 达成条件阈值
+  sortOrder Int         @default(0)
+  createdAt DateTime    @default(now())
+
+  users     UserBadge[]
+
+  @@map("badges")
+}
+
+model UserBadge {
+  id         String   @id @default(cuid())
+  userId     String
+  badgeId    String
+  unlockedAt DateTime @default(now())
+
+  badge      Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+  @@index([userId])
+  @@map("user_badges")
 }
