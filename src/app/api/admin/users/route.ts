@@ -1,10 +1,15 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { successResponse, handleError, paginate } from '@/lib/api'
+import { successResponse, errorResponse, handleError, paginate } from '@/lib/api'
+import { requireAuth } from '@/lib/auth-guard'
 
 // GET /api/admin/users — admin-only user list
 export async function GET(req: NextRequest) {
   try {
+    const auth = requireAuth(req)
+    if (auth instanceof Response) return auth
+    if (auth.role !== 'ADMIN') return errorResponse('Forbidden', 403)
+
     const { searchParams } = new URL(req.url)
     const page = Number(searchParams.get('page') || 1)
     const pageSize = Number(searchParams.get('pageSize') || 50)

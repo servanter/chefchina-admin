@@ -24,6 +24,9 @@ model User {
   passwordHash   String?
   loginAttempts  Int      @default(0)
   lockedUntil    DateTime?
+  isBanned       Boolean  @default(false)
+  bannedAt       DateTime?
+  bannedReason   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -34,6 +37,7 @@ model User {
   notifications Notification[]
   following     Follow[]      @relation("UserFollowing")
   followers     Follow[]      @relation("UserFollowers")
+  reports       Report[]
 
   @@map("users")
 }
@@ -307,4 +311,48 @@ model SearchLog {
 
   @@index([keyword, createdAt])
   @@map("search_logs")
+}
+
+// ─────────────────────────────────────────────
+// 举报（需求 4）
+// ─────────────────────────────────────────────
+model Report {
+  id           String       @id @default(cuid())
+  reporterId   String       // 举报者
+  targetType   ReportTarget // RECIPE 或 COMMENT
+  targetId     String       // 被举报的菜谱/评论 id
+  reason       ReportReason
+  description  String?      // 补充说明
+  status       ReportStatus @default(PENDING)
+  adminNote    String?      // 后台处理备注
+  resolvedAt   DateTime?
+  resolvedBy   String?      // 处理人 userId
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  reporter     User         @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@index([targetType, targetId])
+  @@index([status])
+  @@map("reports")
+}
+
+enum ReportTarget {
+  RECIPE
+  COMMENT
+}
+
+enum ReportReason {
+  SPAM
+  INAPPROPRIATE
+  COPYRIGHT
+  HARMFUL
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
 }

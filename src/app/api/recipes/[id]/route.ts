@@ -25,6 +25,7 @@ const UpdateSchema = z.object({
   sugar: z.number().nonnegative().optional().nullable(),
   isPublished: z.boolean().optional(),
   categoryId: z.string().optional(),
+  updatedAt: z.string().datetime().optional(),
   steps: z.array(z.object({
     stepNumber: z.number().int().positive(),
     titleEn: z.string().optional(),
@@ -41,6 +42,7 @@ const UpdateSchema = z.object({
     unit: z.string().optional(),
     isOptional: z.boolean().default(false),
   })).optional(),
+  tagIds: z.array(z.string()).optional(),
 })
 
 // GET /api/recipes/[id]
@@ -103,8 +105,8 @@ export async function PATCH(
     const auth = requireAuth(req)
     if (auth instanceof Response) return auth
 
-    // 先查出 authorId，再做权限判断
-    const existing = await prisma.recipe.findUnique({ where: { id }, select: { authorId: true } })
+    // 先查出 authorId 和 updatedAt，再做权限判断
+    const existing = await prisma.recipe.findUnique({ where: { id }, select: { authorId: true, updatedAt: true } })
     if (!existing) return errorResponse('Recipe not found', 404)
     if (existing.authorId !== auth.sub && auth.role !== 'ADMIN') {
       return errorResponse('Forbidden', 403)
@@ -112,7 +114,15 @@ export async function PATCH(
 
     const body = await req.json()
     const data = UpdateSchema.parse(body)
-    const { steps, ingredients, ...recipeData } = data
+    const { steps, ingredients, tagIds, updatedAt: clientUpdatedAt, ...recipeData } = data
+
+    // BUG-002: 乐观锁 — 客户端传入 updatedAt 与数据库比对
+    if (clientUpdatedAt) {
+      const dbTime = existing.updatedAt.toISOString()
+      if (clientUpdatedAt !== dbTime) {
+        return errorResponse('Conflict: recipe was modified by another user. Please refresh and try again.', 409)
+      }
+    }
 
     const recipe = await prisma.recipe.update({
       where: { id },
@@ -131,6 +141,12 @@ export async function PATCH(
           ingredients: {
             deleteMany: {},
             create: ingredients,
+          },
+        } : {}),
+        ...(tagIds ? {
+          tags: {
+            deleteMany: {},
+            create: tagIds.map((tagId) => ({ tagId })),
           },
         } : {}),
       },
