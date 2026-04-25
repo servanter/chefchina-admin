@@ -10,7 +10,7 @@ import { successResponse, handleError } from '@/lib/api'
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
-    const count = Math.min(Number(searchParams.get('count') || 1), 10)
+    const count = Math.min(Number(searchParams.get('count')) || 1, 10)
     const categoryId = searchParams.get('categoryId')
     const difficulty = searchParams.get('difficulty')
 

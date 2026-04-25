@@ -13,9 +13,10 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const period = searchParams.get('period') || 'week'
+    const limit = Math.min(Number(searchParams.get('limit')) || 10, 50)
 
     const days = period === 'month' ? 30 : 7
-    const cacheKey = `ranking:${period}`
+    const cacheKey = `ranking:${period}:${limit}`
     const cacheTTL = 60 * 60 // 1 hour
 
     const result = await withCache(cacheKey, cacheTTL, async () => {
@@ -87,7 +88,7 @@ export async function GET(req: NextRequest) {
         ) cm ON cm."recipeId" = r.id
         WHERE r."isPublished" = true
         ORDER BY score DESC, r."createdAt" DESC
-        LIMIT 10
+        LIMIT ${limit}
       `
 
       if (ranked.length === 0) {
