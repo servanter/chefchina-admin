@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { successResponse, handleError } from '@/lib/api'
+import { successResponse, errorResponse, handleError } from '@/lib/api'
 import { z } from 'zod'
 
 const TopicUpdateSchema = z.object({
