@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 import { successResponse, handleError } from '@/lib/api'
 
 // GET /api/level-configs - 获取等级配置

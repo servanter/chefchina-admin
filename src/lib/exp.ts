@@ -1,5 +1,5 @@
 // 经验值和等级管理工具函数
-import prisma from './prisma'
+import { prisma } from './prisma'
 
 /**
  * 给用户增加经验值并自动升级

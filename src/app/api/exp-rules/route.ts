@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 import { successResponse, handleError } from '@/lib/api'
 
 // GET /api/exp-rules - 获取经验值规则

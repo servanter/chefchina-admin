@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { prisma } from '@/lib/prisma'
 import { successResponse, handleError, paginate } from '@/lib/api'
 
 // GET /api/recommend - 个性化推荐
