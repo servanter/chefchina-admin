@@ -11,10 +11,17 @@ export async function apiClient(url: string, options: RequestOptions = {}) {
   const { skipAuth, ...fetchOptions } = options;
 
   // 默认 headers
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    ...fetchOptions.headers,
   };
+
+  // 合并传入的 headers
+  if (fetchOptions.headers) {
+    const incomingHeaders = new Headers(fetchOptions.headers);
+    incomingHeaders.forEach((value, key) => {
+      headers[key] = value;
+    });
+  }
 
   // 自动添加 token
   if (!skipAuth) {
