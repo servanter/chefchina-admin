@@ -27,15 +27,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = async (username: string, password: string): Promise<boolean> => {
-    // 硬编码登录验证
-    if (username === 'admin' && password === '123456') {
-      const mockToken = 'admin-token-' + Date.now();
-      localStorage.setItem('admin_token', mockToken);
-      setToken(mockToken);
-      setIsAuthenticated(true);
-      return true;
+    try {
+      const response = await fetch('/api/auth/admin/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!response.ok) {
+        return false;
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.token) {
+        localStorage.setItem('admin_token', data.token);
+        setToken(data.token);
+        setIsAuthenticated(true);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      console.error('Login error:', error);
+      return false;
     }
-    return false;
   };
 
   const logout = () => {

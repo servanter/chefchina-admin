@@ -1,7 +1,8 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -12,16 +13,20 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     // 登录页不需要验证
     if (pathname === '/login') {
+      // 如果已登录，跳转到 dashboard
+      if (isAuthenticated) {
+        router.push('/dashboard');
+      }
       return;
     }
 
-    // 未登录则跳转
+    // 未登录则跳转到登录页
     if (!isAuthenticated) {
       router.push('/login');
     }
   }, [isAuthenticated, pathname, router]);
 
-  // 登录页直接显示
+  // 登录页直接显示，不包含管理后台布局
   if (pathname === '/login') {
     return <>{children}</>;
   }
@@ -35,5 +40,6 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
+  // 已登录，显示完整内容
   return <>{children}</>;
 }
