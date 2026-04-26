@@ -9,52 +9,81 @@ import { z } from 'zod'
 const CommentSchema = z.object({
   content: z.string().min(1).max(1000),
   rating: z.number().int().min(1).max(5).optional(),
-  images: z.array(z.string()).max(9).optional(), // 最多 9 张图片
+  images: z.array(z.string()).max(9).optional(),
   recipeId: z.string(),
   userId: z.string().optional(),
-  parentId: z.string().optional(),
+  parentId: z.string().nullable().optional(),
 })
 
-// GET /api/comments?recipeId=xxx&all=true (admin: show all including hidden)
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const recipeId = searchParams.get('recipeId')
     const page = Number(searchParams.get('page') || 1)
     const pageSize = Number(searchParams.get('pageSize') || 20)
-    // When `all=true` is passed (admin view), return all comments regardless of visibility
     const showAll = searchParams.get('all') === 'true'
+    const visibility = searchParams.get('visibility')
+    const keyword = searchParams.get('keyword')?.trim()
 
-    if (!recipeId) return errorResponse('recipeId is required', 400)
+    const { take, skip } = paginate(page, pageSize)
 
-    // Skip cache for admin "show all" queries to avoid stale hidden-comment data
+    const keywordFilter = keyword
+      ? {
+          OR: [
+            { content: { contains: keyword, mode: 'insensitive' as const } },
+            { user: { name: { contains: keyword, mode: 'insensitive' as const } } },
+            { user: { email: { contains: keyword, mode: 'insensitive' as const } } },
+          ],
+        }
+      : {}
+
+    const visibilityFilter = showAll
+      ? visibility === 'visible'
+        ? { isVisible: true }
+        : visibility === 'hidden'
+          ? { isVisible: false }
+          : {}
+      : { isVisible: true }
+
+    const where = {
+      ...(recipeId ? { recipeId } : {}),
+      parentId: null,
+      ...visibilityFilter,
+      ...keywordFilter,
+    }
+
     const fetchData = async () => {
-      const { take, skip } = paginate(page, pageSize)
-      const visibilityFilter = showAll ? {} : { isVisible: true }
       const [comments, total] = await Promise.all([
         prisma.comment.findMany({
-          where: { recipeId, parentId: null, ...visibilityFilter },
+          where,
           take,
           skip,
           orderBy: { createdAt: 'desc' },
           include: {
+            recipe: { select: { id: true, titleZh: true, titleEn: true } },
             user: { select: { id: true, name: true, avatar: true } },
             replies: {
-              where: showAll ? {} : { isVisible: true },
+              where: showAll
+                ? visibility === 'visible'
+                  ? { isVisible: true }
+                  : visibility === 'hidden'
+                    ? { isVisible: false }
+                    : {}
+                : { isVisible: true },
               include: { user: { select: { id: true, name: true, avatar: true } } },
               orderBy: { createdAt: 'asc' },
             },
           },
         }),
-        prisma.comment.count({ where: { recipeId, parentId: null, ...visibilityFilter } }),
+        prisma.comment.count({ where }),
       ])
       return { comments, pagination: { page, pageSize: take, total, totalPages: Math.ceil(total / take) } }
     }
 
-    const cacheKey = `comments:${recipeId}:${page}`
-    const result = showAll
-      ? await fetchData()
-      : await withCache(cacheKey, CACHE_TTL.recipes, fetchData)
+    if (!showAll && !recipeId) return errorResponse('recipeId is required', 400)
+
+    const cacheKey = `comments:${recipeId ?? 'all'}:${page}:${visibility ?? 'default'}:${keyword ?? ''}`
+    const result = showAll ? await fetchData() : await withCache(cacheKey, CACHE_TTL.recipes, fetchData)
 
     return successResponse(result)
   } catch (error) {
@@ -62,7 +91,6 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/comments
 export async function POST(req: NextRequest) {
   try {
     const auth = requireAuth(req)
@@ -71,7 +99,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const parsed = CommentSchema.parse(body)
-    const data = { ...parsed, userId }
+    const data = { ...parsed, userId, parentId: parsed.parentId ?? undefined }
 
     const comment = await prisma.comment.create({
       data,
@@ -80,7 +108,6 @@ export async function POST(req: NextRequest) {
       },
     })
 
-    // Fire-and-forget: if this is a reply, notify the author of the parent comment.
     if (data.parentId) {
       try {
         const parent = await prisma.comment.findUnique({
@@ -118,7 +145,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    await invalidateCache([`comments:${data.recipeId}:*`])
+    await invalidateCache([`comments:${data.recipeId}:*`, 'comments:all:*'])
     return successResponse(comment, 201)
   } catch (error) {
     return handleError(error)
