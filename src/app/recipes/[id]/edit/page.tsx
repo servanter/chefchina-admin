@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useForm, useFieldArray } from 'react-hook-form'
+import { api } from '@/lib/api-client'
 
 // ─── Types ────────────────────────────────────────────────
 interface Category {
@@ -133,7 +134,7 @@ export default function EditRecipePage() {
 
   // Fetch categories
   useEffect(() => {
-    fetch('/api/categories')
+    api.get('/api/categories')
       .then((r) => r.json())
       .then((d) => setCategories(d?.data ?? []))
       .catch(() => {})
@@ -143,7 +144,7 @@ export default function EditRecipePage() {
   useEffect(() => {
     if (!recipeId) return
     setLoadingRecipe(true)
-    fetch(`/api/recipes/${recipeId}`)
+    api.get(`/api/recipes/${recipeId}`)
       .then((r) => r.json())
       .then((d) => {
         const recipe = d?.data
@@ -237,11 +238,7 @@ export default function EditRecipePage() {
         })),
       }
 
-      const res = await fetch(`/api/recipes/${recipeId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAdminToken()}` },
-        body: JSON.stringify(payload),
-      })
+      const res = await api.patch(`/api/recipes/${recipeId}`, payload)
 
       const data = await res.json()
 
@@ -622,10 +619,4 @@ export default function EditRecipePage() {
       </form>
     </div>
   )
-}
-
-
-function getAdminToken(): string {
-  if (typeof window === 'undefined') return ''
-  return localStorage.getItem('admin_token') || ''
 }

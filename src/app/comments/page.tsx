@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { api } from '@/lib/api-client'
 
 interface Recipe {
   id: string
@@ -71,7 +72,7 @@ export default function CommentsPage() {
 
   useEffect(() => {
     setLoadingRecipes(true)
-    fetch('/api/recipes?published=false&pageSize=100', { headers: { Authorization: `Bearer ${getAdminToken()}` } })
+    api.get('/api/recipes?published=false&pageSize=100')
       .then((r) => r.json())
       .then((d) => {
         const list: Recipe[] = (d?.data?.recipes ?? []).map((r: Recipe) => ({
@@ -97,9 +98,7 @@ export default function CommentsPage() {
       if (visibility !== 'all') qs.set('visibility', visibility)
       if (keyword.trim()) qs.set('keyword', keyword.trim())
 
-      const res = await fetch(`/api/comments?${qs.toString()}`, {
-        headers: { Authorization: `Bearer ${getAdminToken()}` },
-      })
+      const res = await api.get(`/api/comments?${qs.toString()}`)
       const d = await res.json()
       setComments(d?.data?.comments ?? [])
       setPagination(d?.data?.pagination ?? null)
@@ -118,11 +117,7 @@ export default function CommentsPage() {
   async function toggleVisibility(comment: Comment) {
     setTogglingId(comment.id)
     try {
-      const res = await fetch(`/api/comments/${comment.id}`, {
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAdminToken()}` },
-        method: 'PATCH',
-        body: JSON.stringify({ isVisible: !comment.isVisible }),
-      })
+      const res = await api.patch(`/api/comments/${comment.id}`, { isVisible: !comment.isVisible })
       if (res.ok) {
         setComments((prev) =>
           prev.map((c) => (c.id === comment.id ? { ...c, isVisible: !c.isVisible } : c))
@@ -139,7 +134,7 @@ export default function CommentsPage() {
     if (!confirm('确认删除该评论？此操作不可撤销。')) return
     setDeletingId(id)
     try {
-      const res = await fetch(`/api/comments/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${getAdminToken()}` } })
+      const res = await api.delete(`/api/comments/${id}`)
       if (res.ok) {
         setComments((prev) => prev.filter((c) => c.id !== id))
       } else {
@@ -412,9 +407,4 @@ export default function CommentsPage() {
       </div>
     </div>
   )
-}
-
-function getAdminToken(): string {
-  if (typeof window === 'undefined') return ''
-  return localStorage.getItem('admin_token') || ''
 }

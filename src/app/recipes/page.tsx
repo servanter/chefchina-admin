@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { api } from '@/lib/api-client'
 import Link from 'next/link'
 
 // ─── Types ────────────────────────────────────────────────
@@ -71,7 +72,7 @@ export default function RecipesPage() {
 
   // Fetch categories once
   useEffect(() => {
-    fetch('/api/categories')
+    api.get('/api/categories')
       .then((r) => r.json())
       .then((d) => setCategories(d?.data ?? []))
       .catch(() => {})
@@ -97,7 +98,7 @@ export default function RecipesPage() {
     }
 
     try {
-      const res = await fetch(`/api/recipes?${params}`)
+      const res = await api.get(`/api/recipes?${params}`)
       const d = await res.json()
       let list: Recipe[] = d?.data?.recipes ?? []
       // If the user explicitly wants draft-only, filter client-side
@@ -121,7 +122,7 @@ export default function RecipesPage() {
     if (!confirm(`确认删除菜谱「${title}」？此操作不可撤销。`)) return
     setDeletingId(id)
     try {
-      const res = await fetch(`/api/recipes/${id}`, { method: 'DELETE' })
+      const res = await api.delete(`/api/recipes/${id}`)
       if (res.ok) {
         await fetchRecipes()
       } else {
@@ -136,11 +137,7 @@ export default function RecipesPage() {
 
   async function togglePublish(recipe: Recipe) {
     try {
-      const res = await fetch(`/api/recipes/${recipe.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isPublished: !recipe.isPublished }),
-      })
+      const res = await api.patch(`/api/recipes/${recipe.id}`, { isPublished: !recipe.isPublished })
       if (res.ok) {
         setRecipes((prev) =>
           prev.map((r) => (r.id === recipe.id ? { ...r, isPublished: !r.isPublished } : r))
