@@ -6,11 +6,14 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
+    // 等待 loading 完成
+    if (isLoading) return;
+
     // 登录页不需要验证
     if (pathname === '/login') {
       // 如果已登录，跳转到 dashboard
@@ -24,7 +27,12 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     if (!isAuthenticated) {
       router.push('/login');
     }
-  }, [isAuthenticated, pathname, router]);
+  }, [isAuthenticated, isLoading, pathname, router]);
+
+  // Loading 状态，显示空白页
+  if (isLoading) {
+    return null;
+  }
 
   // 登录页直接显示，不包含管理后台布局
   if (pathname === '/login') {

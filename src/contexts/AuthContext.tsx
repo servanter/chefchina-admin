@@ -8,6 +8,7 @@ interface AuthContextType {
   login: (username: string, password: string) => Promise<boolean>;
   logout: () => void;
   isAuthenticated: boolean;
+  isLoading: boolean; // 添加 loading 状态
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -15,6 +16,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // 添加 loading 状态
   const router = useRouter();
 
   useEffect(() => {
@@ -24,6 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(storedToken);
       setIsAuthenticated(true);
     }
+    setIsLoading(false); // 加载完成
   }, []);
 
   const login = async (username: string, password: string): Promise<boolean> => {
@@ -64,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ token, login, logout, isAuthenticated }}>
+    <AuthContext.Provider value={{ token, login, logout, isAuthenticated, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
