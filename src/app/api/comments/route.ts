@@ -62,6 +62,9 @@ export async function GET(req: NextRequest) {
           include: {
             recipe: { select: { id: true, titleZh: true, titleEn: true } },
             user: { select: { id: true, name: true, avatar: true } },
+            _count: {
+              select: { likes: true },
+            },
             replies: {
               where: showAll
                 ? visibility === 'visible'
@@ -70,7 +73,12 @@ export async function GET(req: NextRequest) {
                     ? { isVisible: false }
                     : {}
                 : { isVisible: true },
-              include: { user: { select: { id: true, name: true, avatar: true } } },
+              include: {
+                user: { select: { id: true, name: true, avatar: true } },
+                _count: {
+                  select: { likes: true },
+                },
+              },
               orderBy: { createdAt: 'asc' },
             },
           },
