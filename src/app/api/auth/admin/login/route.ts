@@ -42,12 +42,15 @@ export async function POST(request: NextRequest) {
     // 生成 JWT token
     const token = jwt.sign(
       {
-        userId: adminUser.id,
-        username: adminUser.username,
-        role: adminUser.role,
+        sub: adminUser.id,           // 改为 sub
+        email: adminUser.username,    // 用 username 作为 email（管理员没有 email 字段）
+        role: adminUser.role as 'USER' | 'ADMIN',
       },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      {
+        expiresIn: '7d',
+        issuer: 'chefchina-admin',  // 添加 issuer
+      }
     );
 
     return NextResponse.json({
