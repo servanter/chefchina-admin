@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { PrismaClient } from '@/generated/prisma';
+import { AUTH_JWT_SECRET } from '@/lib/auth'; // 使用统一的 secret
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-key-change-in-production';
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
         email: adminUser.username,    // 用 username 作为 email（管理员没有 email 字段）
         role: adminUser.role as 'USER' | 'ADMIN',
       },
-      JWT_SECRET,
+      AUTH_JWT_SECRET,  // 使用统一的 secret
       {
         expiresIn: '7d',
         issuer: 'chefchina-admin',  // 添加 issuer
