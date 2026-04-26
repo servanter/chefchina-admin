@@ -17,11 +17,12 @@ const TopicUpdateSchema = z.object({
 // GET /api/topics/[id] - 获取单个话题
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const topic = await prisma.topic.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         _count: {
           select: { recipes: true }
@@ -73,14 +74,15 @@ export async function GET(
 // PATCH /api/topics/[id] - 更新话题
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const body = await request.json()
     const validated = TopicUpdateSchema.parse(body)
 
     const topic = await prisma.topic.update({
-      where: { id: params.id },
+      where: { id },
       data: validated,
       include: {
         _count: {
@@ -98,11 +100,12 @@ export async function PATCH(
 // DELETE /api/topics/[id] - 删除话题
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     await prisma.topic.delete({
-      where: { id: params.id }
+      where: { id }
     })
 
     return NextResponse.json(successResponse({ deleted: true }))
