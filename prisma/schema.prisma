@@ -33,6 +33,7 @@ model User {
   recipes       Recipe[]
   comments      Comment[]
   likes         Like[]
+  commentLikes  CommentLike[]
   favorites     Favorite[]
   notifications Notification[]
   following     Follow[]      @relation("UserFollowing")
@@ -191,16 +192,17 @@ model Comment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id])
-  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id])
-  replies   Comment[] @relation("CommentReplies")
+  recipe    Recipe      @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id])
+  parent    Comment?    @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[]   @relation("CommentReplies")
+  likes     CommentLike[]
 
   @@map("comments")
 }
 
 // ─────────────────────────────────────────
-// 点赞
+// 菜谱点赞
 // ─────────────────────────────────────────
 model Like {
   userId    String
@@ -212,6 +214,22 @@ model Like {
 
   @@id([userId, recipeId])
   @@map("likes")
+}
+
+// ─────────────────────────────────────────
+// 评论点赞
+// ─────────────────────────────────────────
+model CommentLike {
+  userId    String
+  commentId String
+  createdAt DateTime @default(now())
+
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  comment   Comment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+
+  @@id([userId, commentId])
+  @@index([commentId])
+  @@map("comment_likes")
 }
 
 // ─────────────────────────────────────────
