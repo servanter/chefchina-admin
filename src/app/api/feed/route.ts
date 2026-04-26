@@ -107,6 +107,7 @@ export async function GET(req: NextRequest) {
               titleEn: true,
               titleZh: true,
               coverImage: true,
+              isPublished: true,
               category: {
                 select: {
                   nameEn: true,
@@ -143,6 +144,7 @@ export async function GET(req: NextRequest) {
               titleEn: true,
               titleZh: true,
               coverImage: true,
+              isPublished: true,
               category: {
                 select: {
                   nameEn: true,
@@ -162,7 +164,7 @@ export async function GET(req: NextRequest) {
       }),
     ])
 
-    // 合并三种动态，按时间排序
+    // 合并三种动态，按时间排序，过滤未发布菜谱
     const feedItems: FeedItem[] = [
       ...recipes.map(r => ({
         id: `recipe_${r.id}`,
@@ -186,6 +188,12 @@ export async function GET(req: NextRequest) {
         recipe: f.recipe,
       })),
     ]
+      .filter(item => {
+        // 过滤掉关联未发布菜谱的 comment 和 favorite
+        if (item.type === 'comment' && item.comment?.recipe?.isPublished === false) return false
+        if (item.type === 'favorite' && item.recipe?.isPublished === false) return false
+        return true
+      })
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .slice(0, limit)
 
