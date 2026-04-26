@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { errorResponse, handleError } from '@/lib/api'
 import { requireAuth } from '@/lib/auth-guard'
-import { Prisma } from '@/generated/prisma'
+import { Prisma } from '../../../../../generated/prisma'
 
 // Helper function to escape CSV fields
 function escapeCSV(field: any): string {

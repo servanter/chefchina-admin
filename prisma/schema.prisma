@@ -17,7 +17,9 @@ model User {
   email          String   @unique
   name           String?
   avatar         String?
-  bio            String?
+  bio            String?  // REQ-12.4: 用户简介
+  cover          String?  // REQ-12.4: 用户头图
+  specialties    String[] // REQ-12.4: 擅长菜系（多选）
   role           UserRole @default(USER)
   locale         String   @default("en")
   expoPushToken  String?
@@ -29,6 +31,8 @@ model User {
   bannedReason   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  exp            Int      @default(0)  // REQ-12.9: 经验值（改名自 xp）
+  level          Int      @default(1)  // REQ-12.9: 等级 1-10
 
   recipes       Recipe[]
   comments      Comment[]
@@ -39,9 +43,8 @@ model User {
   following     Follow[]      @relation("UserFollowing")
   followers     Follow[]      @relation("UserFollowers")
   reports       Report[]
-  level         Int          @default(1)  // 1-5
-  xp            Int          @default(0)  // 经验值
   badges        UserBadge[]
+  browseHistory BrowseHistory[] // REQ-12.7: 浏览历史
 
   @@map("users")
 }
@@ -106,6 +109,8 @@ model Recipe {
   likes         Like[]
   favorites     Favorite[]
   tags          RecipeTag[]
+  topics        RecipeTopic[] // REQ-12.3: 话题关联
+  browseHistory BrowseHistory[] // REQ-12.7: 浏览历史
 
   @@map("recipes")
 }
@@ -376,6 +381,84 @@ enum ReportStatus {
   REVIEWED
   RESOLVED
   DISMISSED
+}
+
+// ─────────────────────────────────────────
+// 话题标签系统（REQ-12.3）
+// ─────────────────────────────────────────
+model Topic {
+  id          String        @id @default(cuid())
+  nameEn      String
+  nameZh      String
+  descEn      String?
+  descZh      String?
+  icon        String?       // emoji 或图标
+  coverImage  String?       // 话题封面
+  isHot       Boolean       @default(false)  // 是否热门话题
+  sortOrder   Int           @default(0)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  recipes     RecipeTopic[]
+
+  @@map("topics")
+}
+
+model RecipeTopic {
+  recipeId    String
+  topicId     String
+  createdAt   DateTime      @default(now())
+
+  recipe      Recipe        @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  topic       Topic         @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@id([recipeId, topicId])
+  @@index([topicId])
+  @@map("recipe_topics")
+}
+
+// ─────────────────────────────────────────
+// 浏览历史（REQ-12.7 推荐算法）
+// ─────────────────────────────────────────
+model BrowseHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  recipeId    String
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe      Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, recipeId])  // 同一用户对同一菜谱只记录一次（最新）
+  @@index([userId, createdAt])
+  @@index([recipeId])
+  @@map("browse_history")
+}
+
+// ─────────────────────────────────────────
+// 经验值规则（REQ-12.9）
+// ─────────────────────────────────────────
+model ExpRule {
+  id          String   @id @default(cuid())
+  action      String   @unique  // "post_recipe", "get_like", "get_favorite", "daily_login"
+  exp         Int               // 获得的经验值
+  dailyLimit  Int?              // 每日上限（null 表示无限制）
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("exp_rules")
+}
+
+model LevelConfig {
+  level       Int      @id       // 1-10
+  expRequired Int               // 达到该等级需要的总经验值
+  nameEn      String
+  nameZh      String
+  benefits    String            // JSON 字符串描述权益
+  createdAt   DateTime @default(now())
+
+  @@map("level_configs")
 }
 
 // ─────────────────────────────────────────
