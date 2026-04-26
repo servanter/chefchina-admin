@@ -98,6 +98,7 @@ export default function EditRecipePage() {
   const [loadingRecipe, setLoadingRecipe] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [recipeUpdatedAt, setRecipeUpdatedAt] = useState<string | null>(null)
 
   const {
     register,
@@ -150,6 +151,7 @@ export default function EditRecipePage() {
           setError('菜谱不存在或已删除')
           return
         }
+        setRecipeUpdatedAt(recipe.updatedAt ?? null)
         reset({
           titleZh: recipe.titleZh ?? '',
           titleEn: recipe.titleEn ?? '',
@@ -207,8 +209,8 @@ export default function EditRecipePage() {
       const payload = {
         titleZh: values.titleZh,
         titleEn: values.titleEn,
-        descriptionZh: values.descriptionZh || undefined,
-        descriptionEn: values.descriptionEn || undefined,
+        descriptionZh: values.descriptionZh || '',
+        descriptionEn: values.descriptionEn || '',
         categoryId: values.categoryId,
         difficulty: values.difficulty || null,
         cookTimeMin: toIntOrNull(values.cookTimeMin),
@@ -216,10 +218,11 @@ export default function EditRecipePage() {
         calories: toIntOrNull(values.calories),
         coverImage: values.coverImage || null,
         isPublished: values.isPublished,
+        updatedAt: recipeUpdatedAt ?? undefined,
         steps: values.steps.map((s, i) => ({
           stepNumber: i + 1,
-          titleZh: s.titleZh || undefined,
-          titleEn: s.titleEn || undefined,
+          titleZh: s.titleZh || '',
+          titleEn: s.titleEn || '',
           contentZh: s.contentZh,
           contentEn: s.contentEn,
           image: s.image || '',
@@ -229,14 +232,14 @@ export default function EditRecipePage() {
           nameZh: ing.nameZh,
           nameEn: ing.nameEn,
           amount: ing.amount,
-          unit: ing.unit || undefined,
+          unit: ing.unit || '',
           isOptional: !!ing.isOptional,
         })),
       }
 
       const res = await fetch(`/api/recipes/${recipeId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAdminToken()}` },
         body: JSON.stringify(payload),
       })
 
@@ -247,6 +250,7 @@ export default function EditRecipePage() {
         return
       }
 
+      setRecipeUpdatedAt(data?.data?.updatedAt ?? recipeUpdatedAt)
       setSuccess(true)
       setTimeout(() => router.push('/recipes'), 1200)
     } catch {
@@ -618,4 +622,10 @@ export default function EditRecipePage() {
       </form>
     </div>
   )
+}
+
+
+function getAdminToken(): string {
+  if (typeof window === 'undefined') return ''
+  return localStorage.getItem('admin_token') || ''
 }

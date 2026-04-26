@@ -3,7 +3,6 @@ import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleError, paginate } from '@/lib/api'
 import { requireAuth } from '@/lib/auth-guard'
 
-// GET /api/admin/users — admin-only user list
 export async function GET(req: NextRequest) {
   try {
     const auth = requireAuth(req)
@@ -13,10 +12,21 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const page = Number(searchParams.get('page') || 1)
     const pageSize = Number(searchParams.get('pageSize') || 50)
+    const search = searchParams.get('search')?.trim()
     const { take, skip } = paginate(page, pageSize)
+
+    const where = search
+      ? {
+          OR: [
+            { email: { contains: search, mode: 'insensitive' as const } },
+            { name: { contains: search, mode: 'insensitive' as const } },
+          ],
+        }
+      : undefined
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
+        where,
         take,
         skip,
         orderBy: { createdAt: 'desc' },
@@ -32,7 +42,7 @@ export async function GET(req: NextRequest) {
           _count: { select: { recipes: true, comments: true, favorites: true } },
         },
       }),
-      prisma.user.count(),
+      prisma.user.count({ where }),
     ])
 
     return successResponse({

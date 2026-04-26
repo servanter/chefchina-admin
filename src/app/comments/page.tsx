@@ -2,8 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react'
 
-// ─── Types ────────────────────────────────────────────────
 interface Recipe {
+  id: string
+  titleZh: string
+  titleEn: string
+}
+
+interface CommentRecipe {
   id: string
   titleZh: string
   titleEn: string
@@ -22,6 +27,7 @@ interface Comment {
   isVisible: boolean
   createdAt: string
   recipeId: string
+  recipe?: CommentRecipe | null
   user: CommentUser
   replies?: Comment[]
 }
@@ -33,7 +39,6 @@ interface PaginationInfo {
   totalPages: number
 }
 
-// ─── Star Rating ──────────────────────────────────────────
 function StarRating({ rating }: { rating: number }) {
   return (
     <div className="flex gap-0.5">
@@ -51,10 +56,11 @@ function StarRating({ rating }: { rating: number }) {
   )
 }
 
-// ─── Page ─────────────────────────────────────────────────
 export default function CommentsPage() {
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [selectedRecipeId, setSelectedRecipeId] = useState<string>('')
+  const [visibility, setVisibility] = useState<'all' | 'visible' | 'hidden'>('all')
+  const [keyword, setKeyword] = useState('')
   const [comments, setComments] = useState<Comment[]>([])
   const [pagination, setPagination] = useState<PaginationInfo | null>(null)
   const [loading, setLoading] = useState(false)
@@ -63,10 +69,9 @@ export default function CommentsPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  // Fetch recipes for filter dropdown
   useEffect(() => {
     setLoadingRecipes(true)
-    fetch('/api/recipes?published=false&pageSize=100')
+    fetch('/api/recipes?published=false&pageSize=100', { headers: { Authorization: `Bearer ${getAdminToken()}` } })
       .then((r) => r.json())
       .then((d) => {
         const list: Recipe[] = (d?.data?.recipes ?? []).map((r: Recipe) => ({
@@ -75,40 +80,47 @@ export default function CommentsPage() {
           titleEn: r.titleEn,
         }))
         setRecipes(list)
-        if (list.length > 0) {
-          setSelectedRecipeId(list[0].id)
-        }
       })
       .catch(() => {})
       .finally(() => setLoadingRecipes(false))
   }, [])
 
   const fetchComments = useCallback(async () => {
-    if (!selectedRecipeId) return
     setLoading(true)
     try {
-      // Pass all=true so the admin can see hidden comments too
-      const res = await fetch(`/api/comments?recipeId=${selectedRecipeId}&page=${page}&pageSize=20&all=true`)
+      const qs = new URLSearchParams({
+        page: String(page),
+        pageSize: '20',
+        all: 'true',
+      })
+      if (selectedRecipeId) qs.set('recipeId', selectedRecipeId)
+      if (visibility !== 'all') qs.set('visibility', visibility)
+      if (keyword.trim()) qs.set('keyword', keyword.trim())
+
+      const res = await fetch(`/api/comments?${qs.toString()}`, {
+        headers: { Authorization: `Bearer ${getAdminToken()}` },
+      })
       const d = await res.json()
       setComments(d?.data?.comments ?? [])
       setPagination(d?.data?.pagination ?? null)
     } catch {
       setComments([])
+      setPagination(null)
     } finally {
       setLoading(false)
     }
-  }, [selectedRecipeId, page])
+  }, [selectedRecipeId, visibility, keyword, page])
 
   useEffect(() => {
-    if (selectedRecipeId) fetchComments()
-  }, [fetchComments, selectedRecipeId])
+    fetchComments()
+  }, [fetchComments])
 
   async function toggleVisibility(comment: Comment) {
     setTogglingId(comment.id)
     try {
       const res = await fetch(`/api/comments/${comment.id}`, {
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAdminToken()}` },
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ isVisible: !comment.isVisible }),
       })
       if (res.ok) {
@@ -127,7 +139,7 @@ export default function CommentsPage() {
     if (!confirm('确认删除该评论？此操作不可撤销。')) return
     setDeletingId(id)
     try {
-      const res = await fetch(`/api/comments/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/comments/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${getAdminToken()}` } })
       if (res.ok) {
         setComments((prev) => prev.filter((c) => c.id !== id))
       } else {
@@ -144,16 +156,14 @@ export default function CommentsPage() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-5">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">评论管理</h1>
-        <p className="text-sm text-gray-500 mt-0.5">管理用户对菜谱的评论，可切换可见性</p>
+        <p className="text-sm text-gray-500 mt-0.5">默认展示全部评论，可按菜谱、状态和关键词筛选</p>
       </div>
 
-      {/* Filter Bar */}
       <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm flex items-end gap-4 flex-wrap">
-        <div className="flex-1 min-w-[240px]">
-          <label className="block text-xs font-medium text-gray-500 mb-1">选择菜谱</label>
+        <div className="min-w-[240px] flex-1">
+          <label className="block text-xs font-medium text-gray-500 mb-1">菜谱筛选</label>
           {loadingRecipes ? (
             <div className="h-9 bg-gray-100 rounded-lg animate-pulse" />
           ) : (
@@ -165,28 +175,66 @@ export default function CommentsPage() {
               }}
               className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 bg-white"
             >
-              {recipes.length === 0 ? (
-                <option value="">暂无菜谱</option>
-              ) : (
-                recipes.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.titleZh} ({r.titleEn})
-                  </option>
-                ))
-              )}
+              <option value="">全部菜谱</option>
+              {recipes.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.titleZh} ({r.titleEn})
+                </option>
+              ))}
             </select>
           )}
         </div>
+
+        <div className="min-w-[160px]">
+          <label className="block text-xs font-medium text-gray-500 mb-1">可见性</label>
+          <select
+            value={visibility}
+            onChange={(e) => {
+              setVisibility(e.target.value as 'all' | 'visible' | 'hidden')
+              setPage(1)
+            }}
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 bg-white"
+          >
+            <option value="all">全部评论</option>
+            <option value="visible">仅显示中</option>
+            <option value="hidden">仅已隐藏</option>
+          </select>
+        </div>
+
+        <div className="min-w-[220px] flex-1">
+          <label className="block text-xs font-medium text-gray-500 mb-1">关键词</label>
+          <input
+            value={keyword}
+            onChange={(e) => {
+              setKeyword(e.target.value)
+              setPage(1)
+            }}
+            placeholder="搜评论内容 / 用户名 / 邮箱"
+            className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-400/50 focus:border-orange-400 bg-white"
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedRecipeId('')
+            setVisibility('all')
+            setKeyword('')
+            setPage(1)
+          }}
+          className="px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+        >
+          清空条件
+        </button>
+
         {pagination && (
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 ml-auto">
             共 <span className="font-semibold text-gray-800">{pagination.total}</span> 条评论
           </div>
         )}
       </div>
 
-      {/* Comments List */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        {/* Recipe Info Header */}
         {selectedRecipe && (
           <div className="px-5 py-3.5 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
             <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -212,19 +260,12 @@ export default function CommentsPage() {
               </div>
             ))}
           </div>
-        ) : !selectedRecipeId ? (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-            <svg className="w-12 h-12 mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
-            </svg>
-            <p>请先选择一道菜谱</p>
-          </div>
         ) : comments.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
             <svg className="w-12 h-12 mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.129.166 2.27.293 3.423.379.35.026.67.21.865.501L12 21l2.755-4.133a1.14 1.14 0 0 1 .865-.501 48.172 48.172 0 0 0 3.423-.379c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
             </svg>
-            <p>该菜谱暂无评论</p>
+            <p>暂无评论</p>
           </div>
         ) : (
           <div className="divide-y divide-gray-50">
@@ -233,62 +274,68 @@ export default function CommentsPage() {
                 key={comment.id}
                 className={`p-5 transition-colors ${!comment.isVisible ? 'bg-gray-50/60 opacity-70' : 'hover:bg-gray-50/40'}`}
               >
-                <div className="flex items-start gap-3">
-                  {/* Avatar */}
-                  <div className="shrink-0 w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-sm font-bold">
-                    {comment.user.avatar ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={comment.user.avatar} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      (comment.user.name?.[0] ?? 'U').toUpperCase()
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm font-medium text-gray-800">
-                        {comment.user.name ?? '匿名用户'}
-                      </span>
-                      {comment.rating && <StarRating rating={comment.rating} />}
-                      {!comment.isVisible && (
-                        <span className="px-1.5 py-0.5 bg-gray-200 text-gray-500 text-xs rounded font-medium">
-                          已隐藏
-                        </span>
-                      )}
-                      <span className="text-xs text-gray-400 ml-auto">
-                        {new Date(comment.createdAt).toLocaleString('zh-CN', {
-                          year: 'numeric', month: '2-digit', day: '2-digit',
-                          hour: '2-digit', minute: '2-digit',
-                        })}
-                      </span>
+                <div className="grid grid-cols-1 lg:grid-cols-[220px_minmax(0,1fr)_72px] gap-4 items-start">
+                  <div className="min-w-0">
+                    <div className="text-xs font-medium text-gray-500 mb-2">菜谱</div>
+                    <div className="text-sm font-semibold text-gray-800 break-words">
+                      {comment.recipe?.titleZh ?? '未知菜谱'}
                     </div>
-                    <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">{comment.content}</p>
-
-                    {/* Replies */}
-                    {comment.replies && comment.replies.length > 0 && (
-                      <div className="mt-3 space-y-2 pl-3 border-l-2 border-gray-200">
-                        {comment.replies.map((reply) => (
-                          <div key={reply.id} className="flex items-start gap-2">
-                            <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">
-                              {(reply.user.name?.[0] ?? 'U').toUpperCase()}
-                            </div>
-                            <div>
-                              <span className="text-xs font-medium text-gray-700">{reply.user.name ?? '匿名'}</span>
-                              <span className="text-xs text-gray-400 ml-1.5">
-                                {new Date(reply.createdAt).toLocaleDateString('zh-CN')}
-                              </span>
-                              <p className="text-xs text-gray-600 mt-0.5">{reply.content}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                    <div className="text-xs text-gray-400 break-words mt-0.5">
+                      {comment.recipe?.titleEn ?? comment.recipeId}
+                    </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="shrink-0 flex items-center gap-1">
-                    {/* Toggle visibility */}
+                  <div className="flex min-w-0 gap-3">
+                    <div className="shrink-0 w-9 h-9 rounded-full overflow-hidden bg-gradient-to-br from-orange-400 to-orange-600 flex items-center justify-center text-white text-sm font-bold">
+                      {comment.user.avatar ? (
+                        <img src={comment.user.avatar} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        (comment.user.name?.[0] ?? 'U').toUpperCase()
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-gray-800">
+                          {comment.user.name ?? '匿名用户'}
+                        </span>
+                        {comment.rating ? <StarRating rating={comment.rating} /> : null}
+                        {!comment.isVisible && (
+                          <span className="px-1.5 py-0.5 bg-gray-200 text-gray-500 text-xs rounded font-medium">
+                            已隐藏
+                          </span>
+                        )}
+                        <span className="text-xs text-gray-400 ml-auto">
+                          {new Date(comment.createdAt).toLocaleString('zh-CN', {
+                            year: 'numeric', month: '2-digit', day: '2-digit',
+                            hour: '2-digit', minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700 mt-1.5 leading-relaxed break-words">{comment.content}</p>
+
+                      {comment.replies && comment.replies.length > 0 && (
+                        <div className="mt-3 space-y-2 pl-3 border-l-2 border-gray-200">
+                          {comment.replies.map((reply) => (
+                            <div key={reply.id} className="flex items-start gap-2">
+                              <div className="w-7 h-7 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-500 shrink-0">
+                                {(reply.user.name?.[0] ?? 'U').toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <span className="text-xs font-medium text-gray-700">{reply.user.name ?? '匿名'}</span>
+                                <span className="text-xs text-gray-400 ml-1.5">
+                                  {new Date(reply.createdAt).toLocaleDateString('zh-CN')}
+                                </span>
+                                <p className="text-xs text-gray-600 mt-0.5 break-words">{reply.content}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 flex items-center gap-1 justify-end">
                     <button
                       onClick={() => toggleVisibility(comment)}
                       disabled={togglingId === comment.id}
@@ -315,7 +362,6 @@ export default function CommentsPage() {
                         </svg>
                       )}
                     </button>
-                    {/* Delete */}
                     <button
                       onClick={() => handleDelete(comment.id)}
                       disabled={deletingId === comment.id}
@@ -340,7 +386,6 @@ export default function CommentsPage() {
           </div>
         )}
 
-        {/* Pagination */}
         {pagination && pagination.totalPages > 1 && (
           <div className="border-t border-gray-100 px-5 py-3 flex items-center justify-between bg-gray-50">
             <p className="text-xs text-gray-500">
@@ -367,4 +412,9 @@ export default function CommentsPage() {
       </div>
     </div>
   )
+}
+
+function getAdminToken(): string {
+  if (typeof window === 'undefined') return ''
+  return localStorage.getItem('admin_token') || ''
 }
