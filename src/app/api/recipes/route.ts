@@ -43,6 +43,7 @@ const RecipeCreateSchema = z.object({
     isOptional: z.boolean().default(false),
   })).optional(),
   tagIds: z.array(z.string()).optional(),
+  topicIds: z.array(z.string()).optional(),  // REQ-12.3: 话题关联
 })
 
 // GET /api/recipes
@@ -57,8 +58,9 @@ export async function GET(req: NextRequest) {
     const published = searchParams.get('published') !== 'false'
     const sort = searchParams.get('sort') // 'hot' | 'latest' | 'recommended' | 'popular'
     const tagId = searchParams.get('tagId')
+    const topicId = searchParams.get('topicId')  // REQ-12.3
 
-    const cacheKey = `recipes:${page}:${pageSize}:${categoryId}:${difficulty}:${search}:${published}:${sort}:${tagId}`
+    const cacheKey = `recipes:${page}:${pageSize}:${categoryId}:${difficulty}:${search}:${published}:${sort}:${tagId}:${topicId}`
 
     const result = await withCache(cacheKey, CACHE_TTL.recipes, async () => {
       const { take, skip } = paginate(page, pageSize)
@@ -73,6 +75,7 @@ export async function GET(req: NextRequest) {
           ],
         }),
         ...(tagId && { tags: { some: { tagId } } }),
+        ...(topicId && { topics: { some: { topicId } } }),  // REQ-12.3
       }
 
       const orderBy =
@@ -84,6 +87,7 @@ export async function GET(req: NextRequest) {
         category: { select: { id: true, nameEn: true, nameZh: true, slug: true } },
         author: { select: { id: true, name: true, avatar: true } },
         tags: { include: { tag: true } },
+        topics: { include: { topic: true } },  // REQ-12.3
         _count: { select: { likes: true, comments: true, favorites: true } },
       }
 
@@ -115,6 +119,13 @@ export async function GET(req: NextRequest) {
               OR EXISTS (
                 SELECT 1 FROM "recipe_tags" rt
                 WHERE rt."recipeId" = r.id AND rt."tagId" = ${tagId}
+              )
+            )
+            AND (
+              ${topicId}::text IS NULL
+              OR EXISTS (
+                SELECT 1 FROM "recipe_topics" rtp
+                WHERE rtp."recipeId" = r.id AND rtp."topicId" = ${topicId}
               )
             )
           ORDER BY
@@ -221,7 +232,7 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const data = RecipeCreateSchema.parse(body)
-    const { steps, ingredients, tagIds, ...recipeData } = data
+    const { steps, ingredients, tagIds, topicIds, ...recipeData } = data
 
     const recipe = await prisma.recipe.create({
       data: {
@@ -235,6 +246,9 @@ export async function POST(req: NextRequest) {
         }),
         ...(tagIds && {
           tags: { create: tagIds.map(tagId => ({ tagId })) },
+        }),
+        ...(topicIds && {
+          topics: { create: topicIds.map(topicId => ({ topicId })) },
         }),
       },
       include: {

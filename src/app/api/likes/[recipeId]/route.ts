@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleError } from '@/lib/api'
 import { createNotification, hasRecentNotification, DAY_MS } from '@/lib/notifications'
+import { addUserExp } from '@/lib/exp'  // REQ-12.9
 import { requireAuth } from '@/lib/auth-guard'
 
 // POST /api/likes/[recipeId]  — toggle like
@@ -35,6 +36,9 @@ export async function POST(
           select: { authorId: true, titleEn: true, titleZh: true },
         })
         if (recipe && recipe.authorId !== userId) {
+          // REQ-12.9: 作者获得经验值
+          await addUserExp(recipe.authorId, 'get_like')
+          
           // 四元组去重：(actorId, recipientId, type, resourceId)
           // → A 对 B 的多个不同菜谱点赞，每条都能收到；但 24h 内对同一菜谱重复 toggle 只发一条
           const recentlyNotified = await hasRecentNotification({

@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleError } from '@/lib/api'
 import { createNotification, hasRecentNotification, DAY_MS } from '@/lib/notifications'
+import { addUserExp } from '@/lib/exp'  // REQ-12.9
 import { requireAuth } from '@/lib/auth-guard'
 
 // POST /api/favorites/[recipeId] — toggle favorite
@@ -33,6 +34,9 @@ export async function POST(
           select: { authorId: true, titleEn: true, titleZh: true },
         })
         if (recipe && recipe.authorId !== userId) {
+          // REQ-12.9: 作者获得经验值
+          await addUserExp(recipe.authorId, 'get_favorite')
+          
           // 四元组去重：(actorId, recipientId, type, resourceId)
           const recentlyNotified = await hasRecentNotification({
             userId: recipe.authorId,

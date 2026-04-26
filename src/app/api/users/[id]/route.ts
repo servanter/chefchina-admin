@@ -2,12 +2,15 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleError } from '@/lib/api'
 import { requireSelfOrAdmin } from '@/lib/auth-guard'
+import { getUserLevelInfo } from '@/lib/exp'
 import { z } from 'zod'
 
 const UpdateSchema = z.object({
   name: z.string().optional(),
   avatar: z.string().url().optional().nullable(),
   bio: z.string().max(500).optional(),
+  cover: z.string().url().optional().nullable(),  // REQ-12.4
+  specialties: z.array(z.string()).optional(),     // REQ-12.4
   locale: z.string().optional(),
   // role 字段已从此接口移除，角色变更须走专用的 admin 接口
 })
@@ -29,12 +32,17 @@ export async function GET(
             favorites: true,
             followers: true,
             following: true,
+            likes: true,
           } 
         },
       },
     })
     if (!user) return errorResponse('User not found', 404)
-    return successResponse(user)
+    
+    // REQ-12.9: 添加等级信息
+    const levelInfo = await getUserLevelInfo(id)
+    
+    return successResponse({ ...user, levelInfo })
   } catch (error) {
     return handleError(error)
   }

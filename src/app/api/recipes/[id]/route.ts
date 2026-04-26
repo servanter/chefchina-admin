@@ -43,6 +43,7 @@ const UpdateSchema = z.object({
     isOptional: z.boolean().default(false),
   })).optional(),
   tagIds: z.array(z.string()).optional(),
+  topicIds: z.array(z.string()).optional(),  // REQ-12.3
 })
 
 // GET /api/recipes/[id]
@@ -61,6 +62,7 @@ export async function GET(
           steps: { orderBy: { stepNumber: 'asc' } },
           ingredients: true,
           tags: { include: { tag: true } },
+          topics: { include: { topic: true } },  // REQ-12.3
           _count: { select: { likes: true, comments: true, favorites: true } },
         },
       })
@@ -114,7 +116,7 @@ export async function PATCH(
 
     const body = await req.json()
     const data = UpdateSchema.parse(body)
-    const { steps, ingredients, tagIds, updatedAt: clientUpdatedAt, ...recipeData } = data
+    const { steps, ingredients, tagIds, topicIds, updatedAt: clientUpdatedAt, ...recipeData } = data
 
     // BUG-002: 乐观锁 — 客户端传入 updatedAt 与数据库比对
     if (clientUpdatedAt) {
@@ -149,6 +151,12 @@ export async function PATCH(
             create: tagIds.map((tagId) => ({ tagId })),
           },
         } : {}),
+        ...(topicIds ? {
+          topics: {
+            deleteMany: {},
+            create: topicIds.map((topicId) => ({ topicId })),
+          },
+        } : {}),
       },
       include: {
         category: true,
@@ -156,6 +164,7 @@ export async function PATCH(
         steps: { orderBy: { stepNumber: 'asc' } },
         ingredients: true,
         tags: { include: { tag: true } },
+        topics: { include: { topic: true } },  // REQ-12.3
       },
     })
 
