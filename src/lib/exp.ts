@@ -20,9 +20,42 @@ export async function addUserExp(userId: string, action: string): Promise<void> 
     if (rule.dailyLimit !== null) {
       const today = new Date()
       today.setHours(0, 0, 0, 0)
+      const tomorrow = new Date(today)
+      tomorrow.setDate(tomorrow.getDate() + 1)
 
-      // 这里简化处理，实际应该有日志表记录每日行为次数
-      // 暂时跳过每日上限检查，后续可扩展
+      let todayCount = 0
+
+      // 根据 action 类型查询今日行为次数
+      if (action === 'post_recipe') {
+        todayCount = await prisma.recipe.count({
+          where: {
+            authorId: userId,
+            createdAt: {
+              gte: today,
+              lt: tomorrow
+            }
+          }
+        })
+      } else if (action === 'post_comment') {
+        todayCount = await prisma.comment.count({
+          where: {
+            userId,
+            createdAt: {
+              gte: today,
+              lt: tomorrow
+            }
+          }
+        })
+      } else if (action === 'daily_login') {
+        // 注：登录需要单独的日志表，这里简化处理：假设每天只调用一次
+        // 实际应该在 Login API 中检查 lastLoginDate
+        todayCount = 0 // 跳过检查，由调用方保证每天只调用一次
+      }
+
+      if (todayCount >= rule.dailyLimit) {
+        console.log(`User ${userId} reached daily limit for action ${action} (${todayCount}/${rule.dailyLimit})`)
+        return
+      }
     }
 
     // 3. 增加经验值
@@ -101,8 +134,11 @@ export async function getUserLevelInfo(userId: string) {
       expToNextLevel: nextLevelConfig 
         ? Math.max(0, nextLevelConfig.expRequired - user.exp)
         : 0,
-      progressPercent: nextLevelConfig 
-        ? Math.min(100, Math.round((user.exp / nextLevelConfig.expRequired) * 100))
+      progressPercent: nextLevelConfig && currentLevelConfig
+        ? Math.min(100, Math.round(
+            ((user.exp - currentLevelConfig.expRequired) / 
+             (nextLevelConfig.expRequired - currentLevelConfig.expRequired)) * 100
+          ))
         : 100
     }
   } catch (error) {

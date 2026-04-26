@@ -1,17 +1,45 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { successResponse, handleError } from '@/lib/api'
+import { z } from 'zod'
 
 // GET /api/dashboard - 运营数据看板
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
-    const startDate = searchParams.get('startDate') 
-      ? new Date(searchParams.get('startDate')!) 
+
+    // 验证日期参数
+    const schema = z.object({
+      startDate: z.string().datetime().optional(),
+      endDate: z.string().datetime().optional()
+    })
+
+    const validated = schema.safeParse({
+      startDate: searchParams.get('startDate'),
+      endDate: searchParams.get('endDate')
+    })
+
+    if (!validated.success) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid date format. Use ISO 8601 format (e.g., 2026-04-26T00:00:00Z)' },
+        { status: 400 }
+      )
+    }
+
+    const startDate = validated.data.startDate
+      ? new Date(validated.data.startDate)
       : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) // 默认最近30天
-    const endDate = searchParams.get('endDate') 
-      ? new Date(searchParams.get('endDate')!)
+    const endDate = validated.data.endDate
+      ? new Date(validated.data.endDate)
       : new Date()
+
+    // 检查时间范围合理性
+    if (startDate > endDate) {
+      return NextResponse.json(
+        { success: false, error: 'startDate must be before or equal to endDate' },
+        { status: 400 }
+      )
+    }
 
     // 1. 用户统计
     const totalUsers = await prisma.user.count()

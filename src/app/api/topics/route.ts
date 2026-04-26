@@ -20,11 +20,11 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
-    const isHot = searchParams.get('isHot')
+    const isHotParam = searchParams.get('isHot')
 
     const where: any = {}
-    if (isHot !== null) {
-      where.isHot = isHot === 'true'
+    if (isHotParam !== null) {
+      where.isHot = isHotParam === 'true'
     }
 
     const [topics, total] = await Promise.all([

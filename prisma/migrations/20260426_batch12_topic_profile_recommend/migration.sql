@@ -7,7 +7,18 @@
 -- 1. User 表新增字段
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "cover" TEXT;
 ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "specialties" TEXT[] DEFAULT '{}';
-ALTER TABLE "users" RENAME COLUMN "xp" TO "exp";
+
+-- 安全改名：检查 xp 列是否存在再改名
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_name = 'users' AND column_name = 'xp'
+  ) THEN
+    ALTER TABLE "users" RENAME COLUMN "xp" TO "exp";
+  END IF;
+END $$;
+
 ALTER TABLE "users" ALTER COLUMN "level" SET DEFAULT 1;
 -- Note: bio 字段已存在，无需添加
 

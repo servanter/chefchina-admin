@@ -74,7 +74,7 @@ export async function GET(request: Request) {
       // 关注作者的菜谱
       followingIds.length > 0 ? prisma.recipe.findMany({
         where: {
-          authorId: { in: followingIds },
+          authorId: { in: followingIds, not: userId },
           id: { notIn: excludeIds },
           isPublished: true
         },
@@ -97,6 +97,7 @@ export async function GET(request: Request) {
       categoryIds.length > 0 ? prisma.recipe.findMany({
         where: {
           categoryId: { in: categoryIds },
+          authorId: { not: userId },
           id: { notIn: excludeIds },
           isPublished: true
         },
@@ -123,6 +124,7 @@ export async function GET(request: Request) {
               tagId: { in: tagIds }
             }
           },
+          authorId: { not: userId },
           id: { notIn: excludeIds },
           isPublished: true
         },
@@ -144,6 +146,7 @@ export async function GET(request: Request) {
       // 全站热门（兜底）
       prisma.recipe.findMany({
         where: {
+          authorId: { not: userId },
           id: { notIn: excludeIds },
           isPublished: true
         },
