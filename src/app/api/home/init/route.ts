@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, handleError } from '@/lib/api'
-import { withCache } from '@/lib/redis'
+import { withCache, CACHE_TTL } from '@/lib/redis'
 
 /**
  * GET /api/home/init
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
         prisma.recipe.findMany({
           where: {
             isPublished: true,
-            difficulty: 'easy',
+            difficulty: 'EASY',
           },
           take: 6,
           orderBy: { createdAt: 'desc' },
@@ -129,7 +129,7 @@ export async function GET(req: NextRequest) {
         unreadCount = await prisma.notification.count({
           where: {
             userId,
-            isRead: false,
+            readAt: null,  // 正确字段：readAt 为 null 表示未读
           },
         })
       }

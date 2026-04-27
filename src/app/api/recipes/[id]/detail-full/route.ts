@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleError } from '@/lib/api'
-import { withCache } from '@/lib/redis'
+import { withCache, CACHE_TTL } from '@/lib/redis'
 
 /**
  * GET /api/recipes/:id/detail-full
@@ -28,7 +28,7 @@ export async function GET(
     // 缓存 2 分钟（匿名用户可共享缓存）
     const cacheKey = userId ? `recipe:detail-full:${id}:${userId}` : `recipe:detail-full:${id}`
     
-    const data = await withCache(cacheKey, 60 * 2, async () => {
+    const data = await withCache(cacheKey, CACHE_TTL.recipe, async () => {
       // 1. 菜谱详情 + 作者信息
       const recipe = await prisma.recipe.findUnique({
         where: { id },
@@ -56,10 +56,14 @@ export async function GET(
             },
           },
           tags: {
-            select: {
-              id: true,
-              label: true,
-              labelZh: true,
+            include: {
+              tag: {
+                select: {
+                  id: true,
+                  nameEn: true,
+                  nameZh: true,
+                },
+              },
             },
           },
           _count: {
@@ -91,8 +95,8 @@ export async function GET(
           titleZh: true,
           coverImage: true,
           difficulty: true,
-          prepTime: true,
-          cookTime: true,
+          cookTimeMin: true,
+          servings: true,
           _count: {
             select: {
               likes: true,
@@ -102,31 +106,38 @@ export async function GET(
         },
       })
 
-      // 3. 评论列表（前 10 条，按热度排序）
+      // 3. 评论列表（前 10 条，按创建时间排序）
       const comments = await prisma.comment.findMany({
         where: { recipeId: id },
         take: 10,
-        orderBy: [
-          { likesCount: 'desc' }, // 优先显示高赞评论
-          { createdAt: 'desc' },
-        ],
+        orderBy: { createdAt: 'desc' },
         include: {
-          author: {
+          user: {
             select: {
               id: true,
               name: true,
               avatar: true,
             },
           },
+          _count: {
+            select: {
+              likes: true,
+            },
+          },
           replies: {
             take: 3,
             orderBy: { createdAt: 'asc' },
             include: {
-              author: {
+              user: {
                 select: {
                   id: true,
                   name: true,
                   avatar: true,
+                },
+              },
+              _count: {
+                select: {
+                  likes: true,
                 },
               },
             },
@@ -166,27 +177,17 @@ export async function GET(
         }
       }
 
-      // 5. 作者等级信息（如果需要显示）
-      const authorLevel = await prisma.userLevel.findUnique({
-        where: { userId: recipe.authorId },
-        select: {
-          level: true,
-          exp: true,
-          nextLevelExp: true,
-        },
-      })
-
       return {
         recipe: {
           ...recipe,
           likesCount: recipe._count.likes,
           favoritesCount: recipe._count.favorites,
           commentsCount: recipe._count.comments,
+          tags: recipe.tags.map((rt) => rt.tag),
         },
         related,
         comments,
         userStatus,
-        authorLevel: authorLevel || { level: 1, exp: 0, nextLevelExp: 100 },
       }
     })
 
