@@ -20,7 +20,8 @@ export async function GET(req: NextRequest) {
       const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
       const last30Days = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
 
-      // 总体统计
+      // 总体统计（分批查询，减少并发连接数）
+      // Batch 1: 基础统计（8 个查询）
       const [
         totalRecipes,
         publishedRecipes,
@@ -30,15 +31,6 @@ export async function GET(req: NextRequest) {
         totalLikes,
         totalFavorites,
         totalViews,
-        avgRating,
-        // 7天新增
-        recipesLast7Days,
-        usersLast7Days,
-        commentsLast7Days,
-        // 30天新增
-        recipesLast30Days,
-        usersLast30Days,
-        commentsLast30Days,
       ] = await Promise.all([
         prisma.recipe.count(),
         prisma.recipe.count({ where: { isPublished: true } }),
@@ -48,97 +40,107 @@ export async function GET(req: NextRequest) {
         prisma.like.count(),
         prisma.favorite.count(),
         prisma.recipe.aggregate({ _sum: { viewCount: true } }),
+      ])
+
+      // Batch 2: 评分统计 + 近期数据（7 个查询）
+      const [
+        avgRating,
+        recipesLast7Days,
+        usersLast7Days,
+        commentsLast7Days,
+        recipesLast30Days,
+        usersLast30Days,
+        commentsLast30Days,
+      ] = await Promise.all([
         prisma.comment.aggregate({
           _avg: { rating: true },
           where: { rating: { not: null } },
         }),
-        // 7天新增
         prisma.recipe.count({ where: { createdAt: { gte: last7Days } } }),
         prisma.user.count({ where: { createdAt: { gte: last7Days } } }),
         prisma.comment.count({ where: { createdAt: { gte: last7Days } } }),
-        // 30天新增
         prisma.recipe.count({ where: { createdAt: { gte: last30Days } } }),
         prisma.user.count({ where: { createdAt: { gte: last30Days } } }),
         prisma.comment.count({ where: { createdAt: { gte: last30Days } } }),
       ])
 
-      // 分类分布
-      const categoryStats = await prisma.category.findMany({
-        include: {
-          _count: { select: { recipes: true } },
-        },
-      })
+      // Batch 3: 分类分布 + 热门菜谱 + 活跃用户（5 个查询）
+      const [
+        categoryStats,
+        topRecipesByViews,
+        topRecipesByFavorites,
+        topUsersByComments,
+        topUsersByRecipes,
+      ] = await Promise.all([
+        prisma.category.findMany({
+          include: {
+            _count: { select: { recipes: true } },
+          },
+        }),
+        prisma.recipe.findMany({
+          where: { isPublished: true },
+          take: 10,
+          orderBy: { viewCount: 'desc' },
+          select: {
+            id: true,
+            titleEn: true,
+            titleZh: true,
+            viewCount: true,
+            _count: { select: { likes: true, comments: true, favorites: true } },
+          },
+        }),
+        prisma.recipe.findMany({
+          where: { isPublished: true },
+          take: 10,
+          orderBy: { favorites: { _count: 'desc' } },
+          select: {
+            id: true,
+            titleEn: true,
+            titleZh: true,
+            _count: { select: { likes: true, comments: true, favorites: true } },
+          },
+        }),
+        prisma.user.findMany({
+          take: 10,
+          orderBy: { comments: { _count: 'desc' } },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+            _count: {
+              select: {
+                comments: true,
+                recipes: true,
+                likes: true,
+                favorites: true,
+              },
+            },
+          },
+        }),
+        prisma.user.findMany({
+          take: 10,
+          orderBy: { recipes: { _count: 'desc' } },
+          where: { recipes: { some: {} } },
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            avatar: true,
+            _count: {
+              select: {
+                comments: true,
+                recipes: true,
+                likes: true,
+                favorites: true,
+              },
+            },
+          },
+        }),
+      ])
 
       // 按菜谱数量排序
       const sortedCategories = categoryStats.sort((a, b) => b._count.recipes - a._count.recipes)
-
-      // 热门菜谱（按浏览量）
-      const topRecipesByViews = await prisma.recipe.findMany({
-        where: { isPublished: true },
-        take: 10,
-        orderBy: { viewCount: 'desc' },
-        select: {
-          id: true,
-          titleEn: true,
-          titleZh: true,
-          viewCount: true,
-          _count: { select: { likes: true, comments: true, favorites: true } },
-        },
-      })
-
-      // 热门菜谱（按收藏量）
-      const topRecipesByFavorites = await prisma.recipe.findMany({
-        where: { isPublished: true },
-        take: 10,
-        orderBy: { favorites: { _count: 'desc' } },
-        select: {
-          id: true,
-          titleEn: true,
-          titleZh: true,
-          _count: { select: { likes: true, comments: true, favorites: true } },
-        },
-      })
-
-      // 活跃用户（按评论数）
-      const topUsersByComments = await prisma.user.findMany({
-        take: 10,
-        orderBy: { comments: { _count: 'desc' } },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          avatar: true,
-          _count: {
-            select: {
-              comments: true,
-              recipes: true,
-              likes: true,
-              favorites: true,
-            },
-          },
-        },
-      })
-
-      // 活跃用户（按菜谱数）
-      const topUsersByRecipes = await prisma.user.findMany({
-        take: 10,
-        orderBy: { recipes: { _count: 'desc' } },
-        where: { recipes: { some: {} } },
-        select: {
-          id: true,
-          name: true,
-          email: true,
-          avatar: true,
-          _count: {
-            select: {
-              comments: true,
-              recipes: true,
-              likes: true,
-              favorites: true,
-            },
-          },
-        },
-      })
 
       return {
         overview: {
