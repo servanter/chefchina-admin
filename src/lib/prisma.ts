@@ -11,9 +11,10 @@ export const prisma =
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
     datasources: {
       db: {
-        // 设置连接池大小为 30（应对高并发场景，stats 接口会并发 16+ 个查询）
-        // 注意：Vercel Hobby 免费版数据库默认最大连接数是 60
-        url: process.env.DATABASE_URL + '?connection_limit=30&pool_timeout=20',
+        // 设置连接池大小为 50（应对高并发场景 + Vercel Serverless 冷启动）
+        // Vercel Hobby 免费版数据库默认最大连接数是 60
+        // 留出 10 个连接作为余量，避免其他服务（如数据库管理工具）无法连接
+        url: process.env.DATABASE_URL + '?connection_limit=50&pool_timeout=30',
       },
     },
   })
