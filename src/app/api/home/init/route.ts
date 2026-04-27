@@ -143,7 +143,14 @@ export async function GET(req: NextRequest) {
           nameZh: cat.nameZh,
           recipesCount: cat._count.recipes,
         })),
-        ranking,
+        ranking: ranking.map(r => {
+          const { _count, ...cleanR } = r;
+          return {
+            ...cleanR,
+            likesCount: _count.likes,
+            favoritesCount: _count.favorites,
+          };
+        }),
         unreadCount,
       }
     })
