@@ -188,15 +188,21 @@ export async function DELETE(
     if (auth instanceof Response) return auth
 
     // 先查出 authorId，再做权限判断
-    const existing = await prisma.recipe.findUnique({ where: { id }, select: { authorId: true } })
+    const existing = await prisma.recipe.findUnique({
+      where: { id },
+      select: { authorId: true, isPublished: true },
+    })
     if (!existing) return errorResponse('Recipe not found', 404)
     if (existing.authorId !== auth.sub && auth.role !== 'ADMIN') {
       return errorResponse('Forbidden', 403)
     }
 
-    await prisma.recipe.delete({ where: { id } })
+    await prisma.recipe.update({
+      where: { id },
+      data: { isPublished: false },
+    })
     await invalidateCache([`recipe:${id}`, 'recipes:*'])
-    return successResponse({ deleted: true })
+    return successResponse({ deleted: true, softDeleted: true })
   } catch (error) {
     return handleError(error)
   }

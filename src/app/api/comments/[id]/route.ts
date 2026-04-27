@@ -7,7 +7,7 @@ import { z } from 'zod'
 
 const UpdateSchema = z.object({
   isVisible: z.boolean().optional(),
-  content: z.string().min(1).max(1000).optional(),
+  content: z.string().trim().min(1).max(1000).optional(),
 })
 
 // GET /api/comments/[id]
@@ -80,7 +80,10 @@ export async function DELETE(
     if (auth instanceof Response) return auth
 
     const { id } = await params
-    const comment = await prisma.comment.findUnique({ where: { id }, select: { recipeId: true, userId: true } })
+    const comment = await prisma.comment.findUnique({
+      where: { id },
+      select: { recipeId: true, userId: true, isVisible: true },
+    })
     if (!comment) return errorResponse('Comment not found', 404)
 
     // Verify the requester is the comment author or an ADMIN
@@ -88,11 +91,17 @@ export async function DELETE(
       return errorResponse('Forbidden', 403)
     }
 
-    // Delete all child replies first to avoid foreign key constraint errors,
-    // then delete the comment itself.
-    await prisma.comment.deleteMany({ where: { parentId: id } })
-    await prisma.comment.delete({ where: { id } })
-    await invalidateCache([`comments:${comment.recipeId}:1`, `comments:${comment.recipeId}:2`, `comments:${comment.recipeId}:3`])
+    if (!comment.isVisible) {
+      return successResponse({ deleted: true, alreadyDeleted: true })
+    }
+
+    await prisma.comment.updateMany({
+      where: {
+        OR: [{ id }, { parentId: id }],
+      },
+      data: { isVisible: false },
+    })
+    await invalidateCache([`comments:${comment.recipeId}:*`, 'comments:all:*'])
     return successResponse({ deleted: true })
   } catch (error) {
     return handleError(error)
