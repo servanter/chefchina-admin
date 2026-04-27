@@ -215,15 +215,26 @@ export async function GET(
         }, {} as Record<string, boolean>)
       }
 
+      // 清理返回数据：删除 _count，只保留驼峰字段
+      const { _count, ...cleanRecipe } = recipe;
+      
       return {
         recipe: {
-          ...recipe,
-          likesCount: recipe._count.likes,
-          favoritesCount: recipe._count.favorites,
-          commentsCount: recipe._count.comments,
+          ...cleanRecipe,
+          likesCount: _count.likes,
+          favoritesCount: _count.favorites,
+          commentsCount: _count.comments,
           tags: recipe.tags.map((rt) => rt.tag),
         },
-        related,
+        related: related.map(r => {
+          const { _count: rc, ...cleanR } = r;
+          return {
+            ...cleanR,
+            likesCount: rc.likes,
+            favoritesCount: rc.favorites,
+            // related 没有 comments count
+          };
+        }),
         comments,
         userStatus,
         commentLikeStatus, // 新增：评论点赞状态
