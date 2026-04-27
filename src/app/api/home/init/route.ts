@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, handleError } from '@/lib/api'
-import { withCache } from '@/lib/redis'
+import { withCache, CACHE_TTL } from '@/lib/redis'
 
 /**
  * GET /api/home/init
@@ -28,22 +28,21 @@ export async function GET(req: NextRequest) {
     const data = await withCache(cacheKey, cacheTTL, async () => {
       // Batch 1: 基础数据（4 个查询）
       const [featured, quick, categories, ranking] = await Promise.all([
-        // 精选菜谱（3 条）
+        // 精选菜谱（按浏览量排序，取前 3 条）
         prisma.recipe.findMany({
           where: {
             isPublished: true,
-            isFeatured: true,
           },
           take: 3,
-          orderBy: { featuredAt: 'desc' },
+          orderBy: { viewCount: 'desc' },
           select: {
             id: true,
             titleEn: true,
             titleZh: true,
             coverImage: true,
             difficulty: true,
-            prepTime: true,
-            cookTime: true,
+            cookTimeMin: true,
+            servings: true,
             viewCount: true,
             _count: {
               select: {
@@ -59,7 +58,7 @@ export async function GET(req: NextRequest) {
         prisma.recipe.findMany({
           where: {
             isPublished: true,
-            difficulty: 'easy',
+            difficulty: 'EASY',
           },
           take: 6,
           orderBy: { createdAt: 'desc' },
@@ -69,8 +68,8 @@ export async function GET(req: NextRequest) {
             titleZh: true,
             coverImage: true,
             difficulty: true,
-            prepTime: true,
-            cookTime: true,
+            cookTimeMin: true,
+            servings: true,
             _count: {
               select: {
                 likes: true,
@@ -130,7 +129,7 @@ export async function GET(req: NextRequest) {
         unreadCount = await prisma.notification.count({
           where: {
             userId,
-            isRead: false,
+            readAt: null,  // 正确字段：readAt 为 null 表示未读
           },
         })
       }
