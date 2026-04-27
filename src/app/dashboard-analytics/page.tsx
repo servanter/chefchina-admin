@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { api } from '@/lib/api-client'
 import { 
   ChartBarIcon, 
   UserGroupIcon, 
@@ -51,7 +52,7 @@ export default function DashboardPage() {
 
   const fetchData = async () => {
     try {
-      const res = await fetch(`/api/dashboard?startDate=${startDate}&endDate=${endDate}`)
+      const res = await api.get(`/api/dashboard?startDate=${startDate}&endDate=${endDate}`)
       const json = await res.json()
       if (json.success) {
         setData(json.data)

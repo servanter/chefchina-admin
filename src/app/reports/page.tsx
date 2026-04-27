@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { api } from '@/lib/api-client'
 
 interface Report {
   id: string
@@ -55,9 +56,7 @@ export default function ReportsPage() {
       if (statusFilter) params.set('status', statusFilter)
       if (targetTypeFilter) params.set('targetType', targetTypeFilter)
 
-      const res = await fetch(`/api/reports?${params}`, {
-        headers: { Authorization: `Bearer ${getAdminToken()}` },
-      })
+      const res = await api.get(`/api/reports?${params}`)
       const json = await res.json()
       if (json.success) {
         setReports(json.data.reports)
@@ -79,14 +78,7 @@ export default function ReportsPage() {
       const body: any = { status }
       if (adminNote.trim()) body.adminNote = adminNote.trim()
 
-      const res = await fetch(`/api/reports/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getAdminToken()}`,
-        },
-        body: JSON.stringify(body),
-      })
+      const res = await api.patch(`/api/reports/${id}`, body)
       const json = await res.json()
       if (json.success) {
         setReports((prev) => prev.map((r) => (r.id === id ? json.data : r)))
@@ -246,11 +238,4 @@ export default function ReportsPage() {
       )}
     </div>
   )
-}
-
-function getAdminToken(): string {
-  if (typeof window !== 'undefined') {
-    return localStorage.getItem('admin_token') || ''
-  }
-  return ''
 }

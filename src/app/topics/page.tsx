@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { api } from '@/lib/api-client'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 
 interface Topic {
@@ -41,7 +42,7 @@ export default function TopicsPage() {
 
   const fetchTopics = async () => {
     try {
-      const res = await fetch('/api/topics')
+      const res = await api.get('/api/topics')
       const data = await res.json()
       if (data.success) {
         setTopics(data.data.topics)
@@ -82,7 +83,7 @@ export default function TopicsPage() {
     if (!confirm('确定要删除这个话题吗？')) return
 
     try {
-      const res = await fetch(`/api/topics/${id}`, { method: 'DELETE' })
+      const res = await api.delete(`/api/topics/${id}`)
       const data = await res.json()
       if (data.success) {
         await fetchTopics()

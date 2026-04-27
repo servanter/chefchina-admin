@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { api } from '@/lib/api-client'
 
 interface User {
   id: string
@@ -51,9 +52,7 @@ export default function UsersPage() {
     try {
       const qs = new URLSearchParams({ page: String(page), pageSize: '20' })
       if (search.trim()) qs.set('search', search.trim())
-      const res = await fetch(`/api/admin/users?${qs.toString()}`, {
-        headers: { Authorization: `Bearer ${getAdminToken()}` },
-      })
+      const res = await api.get(`/api/admin/users?${qs.toString()}`)
       const d = await res.json()
       if (!res.ok) {
         setUsers([])
@@ -66,7 +65,7 @@ export default function UsersPage() {
     } catch {
       setUsers([])
       setPagination(null)
-      setError('网络错误，请重试')
+      setError('网络错误,请重试')
     } finally {
       setLoading(false)
     }
@@ -228,9 +227,4 @@ export default function UsersPage() {
       </div>
     </div>
   )
-}
-
-function getAdminToken(): string {
-  if (typeof window === 'undefined') return ''
-  return localStorage.getItem('admin_token') || ''
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { api } from '@/lib/api-client'
 
 // ─── Types ───────────────────────────────────────────────
 interface OverviewStats {
@@ -129,7 +130,7 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const res = await fetch('/api/admin/stats')
+        const res = await api.get('/api/admin/stats')
         if (!res.ok) throw new Error('Failed to fetch stats')
         const json = await res.json()
         setData(json.data)

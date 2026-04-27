@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { api } from '@/lib/api-client'
 
 // ─── Types ────────────────────────────────────────────────
 interface Category {
@@ -75,7 +76,7 @@ export default function CategoriesPage() {
   const fetchCategories = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/categories')
+      const res = await api.get('/api/categories')
       const d = await res.json()
       setCategories(d?.data ?? [])
     } catch {
@@ -141,17 +142,9 @@ export default function CategoriesPage() {
 
       let res: Response
       if (isEditing) {
-        res = await fetch(`/api/categories/${editingId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
+        res = await api.patch(`/api/categories/${editingId}`, payload)
       } else {
-        res = await fetch('/api/categories', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        })
+        res = await api.post('/api/categories', payload)
       }
 
       const data = await res.json()
@@ -173,7 +166,7 @@ export default function CategoriesPage() {
     if (!confirm(`确认删除分类「${name}」？若该分类下有菜谱，删除会失败。`)) return
     setDeletingId(id)
     try {
-      const res = await fetch(`/api/categories/${id}`, { method: 'DELETE' })
+      const res = await api.delete(`/api/categories/${id}`)
       if (res.ok) {
         await fetchCategories()
       } else {

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { api } from '@/lib/api-client'
 import { useRouter } from 'next/navigation'
 import { useForm, useFieldArray } from 'react-hook-form'
 
@@ -123,7 +124,7 @@ export default function NewRecipePage() {
 
   // Fetch categories
   useEffect(() => {
-    fetch('/api/categories')
+    api.get('/api/categories')
       .then((r) => r.json())
       .then((d) => setCategories(d?.data ?? []))
       .catch(() => {})
@@ -162,11 +163,7 @@ export default function NewRecipePage() {
         })),
       }
 
-      const res = await fetch('/api/recipes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
+      const res = await api.post('/api/recipes', payload)
 
       const data = await res.json()
 
