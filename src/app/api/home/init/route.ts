@@ -28,22 +28,21 @@ export async function GET(req: NextRequest) {
     const data = await withCache(cacheKey, cacheTTL, async () => {
       // Batch 1: 基础数据（4 个查询）
       const [featured, quick, categories, ranking] = await Promise.all([
-        // 精选菜谱（3 条）
+        // 精选菜谱（按浏览量排序，取前 3 条）
         prisma.recipe.findMany({
           where: {
             isPublished: true,
-            isFeatured: true,
           },
           take: 3,
-          orderBy: { featuredAt: 'desc' },
+          orderBy: { viewCount: 'desc' },
           select: {
             id: true,
             titleEn: true,
             titleZh: true,
             coverImage: true,
             difficulty: true,
-            prepTime: true,
-            cookTime: true,
+            cookTimeMin: true,
+            servings: true,
             viewCount: true,
             _count: {
               select: {
@@ -69,8 +68,8 @@ export async function GET(req: NextRequest) {
             titleZh: true,
             coverImage: true,
             difficulty: true,
-            prepTime: true,
-            cookTime: true,
+            cookTimeMin: true,
+            servings: true,
             _count: {
               select: {
                 likes: true,
