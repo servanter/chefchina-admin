@@ -4,6 +4,7 @@ import { successResponse, errorResponse, handleError } from '@/lib/api'
 import { createNotification, hasRecentNotification, DAY_MS } from '@/lib/notifications'
 import { addUserExp } from '@/lib/exp'  // REQ-12.9
 import { requireAuth } from '@/lib/auth-guard'
+import { invalidateCache } from '@/lib/redis'
 
 // POST /api/likes/[recipeId]  — toggle like
 export async function POST(
@@ -24,10 +25,14 @@ export async function POST(
     if (existing) {
       await prisma.like.delete({ where: { userId_recipeId: { userId, recipeId } } })
       const count = await prisma.like.count({ where: { recipeId } })
+      // 清除该用户的详情页缓存
+      await invalidateCache([`recipe:detail-full:${recipeId}:${userId}`])
       return successResponse({ liked: false, count })
     } else {
       await prisma.like.create({ data: { userId, recipeId } })
       const count = await prisma.like.count({ where: { recipeId } })
+      // 清除该用户的详情页缓存
+      await invalidateCache([`recipe:detail-full:${recipeId}:${userId}`])
 
       // Notify recipe author (but not the author themself, and de-dupe within 24h)
       try {
