@@ -15,12 +15,14 @@ const CreateSchema = z.object({
   payload: z.record(z.string(), z.any()).optional().nullable(),
 })
 
-// GET /api/notifications?userId=xxx&unreadOnly=true&page=1&pageSize=20
+// GET /api/notifications?userId=xxx&unreadOnly=true&tab=all|like|comment|system&page=1&pageSize=20
+// REQ-16.2: 增加 tab 参数支持分类查询
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const userId = searchParams.get('userId')
     const unreadOnly = searchParams.get('unreadOnly') === 'true'
+    const tab = searchParams.get('tab') || 'all'
     const page = Number(searchParams.get('page') || 1)
     const pageSize = Number(searchParams.get('pageSize') || 20)
 
@@ -32,10 +34,24 @@ export async function GET(req: NextRequest) {
     const guard = requireSelfOrAdmin(req, userId, auth)
     if (guard instanceof Response) return guard
 
+    // REQ-16.2: 定义类型映射
+    const typeMap: Record<string, string[] | undefined> = {
+      all: undefined, // undefined 表示所有类型
+      like: ['RECIPE_LIKED', 'RECIPE_FAVORITED'],
+      comment: ['COMMENT_REPLY'],
+      system: ['SUBMISSION_APPROVED', 'SYSTEM'],
+    }
+
+    const types = typeMap[tab]
+
     const { take, skip } = paginate(page, pageSize)
-    const where = unreadOnly
-      ? { userId, readAt: null }
-      : { userId }
+    const where: any = { userId }
+    if (unreadOnly) {
+      where.readAt = null
+    }
+    if (types) {
+      where.type = { in: types }
+    }
 
     const [notifications, total, unreadCount] = await Promise.all([
       notif.findMany({
