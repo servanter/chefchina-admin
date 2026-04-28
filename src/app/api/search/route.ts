@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
 
     // 搜索用户
     if (type === 'all' || type === 'user') {
-      const userWhere = {
+      const userWhere: any = {
         OR: [
           { name: { contains: q, mode: 'insensitive' } },
           { email: { contains: q, mode: 'insensitive' } },
@@ -136,7 +136,7 @@ export async function GET(req: NextRequest) {
 
     // 搜索话题
     if (type === 'all' || type === 'topic') {
-      const topicWhere = {
+      const topicWhere: any = {
         OR: [
           { nameEn: { contains: q, mode: 'insensitive' } },
           { nameZh: { contains: q, mode: 'insensitive' } },
