@@ -48,13 +48,14 @@ export async function GET(req: NextRequest) {
       if (difficulty) {
         recipeWhere.difficulty = difficulty.toUpperCase()
       }
+      // BUG-001: 统一烹饪时间格式为 '<30' | '30-60' | '>60'
       if (cookTime) {
-        if (cookTime === '<15') {
-          recipeWhere.cookTimeMin = { lt: 15 }
-        } else if (cookTime === '15-30') {
-          recipeWhere.cookTimeMin = { gte: 15, lte: 30 }
-        } else if (cookTime === '>30') {
-          recipeWhere.cookTimeMin = { gt: 30 }
+        if (cookTime === '<30') {
+          recipeWhere.cookTimeMin = { lt: 30 }
+        } else if (cookTime === '30-60') {
+          recipeWhere.cookTimeMin = { gte: 30, lte: 60 }
+        } else if (cookTime === '>60') {
+          recipeWhere.cookTimeMin = { gt: 60 }
         }
       }
 
