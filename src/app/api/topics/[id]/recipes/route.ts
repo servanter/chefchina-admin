@@ -30,7 +30,7 @@ export async function GET(
     }
 
     const [recipeTopics, total] = await Promise.all([
-      prisma.recipeTopics.findMany({
+      prisma.recipeTopic.findMany({
         where: { topicId: id },
         include: {
           recipe: {
@@ -58,12 +58,10 @@ export async function GET(
               },
               ...(userId ? {
                 likes: {
-                  where: { userId },
-                  select: { id: true }
+                  where: { userId }
                 },
                 favorites: {
-                  where: { userId },
-                  select: { id: true }
+                  where: { userId }
                 }
               } : {})
             }
@@ -72,7 +70,7 @@ export async function GET(
         orderBy: orderBy,
         ...paginate(page, limit)
       }),
-      prisma.recipeTopics.count({
+      prisma.recipeTopic.count({
         where: { topicId: id }
       })
     ]);
