@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleError } from '@/lib/api'
+import { getUserIdFromToken } from '@/lib/auth'
 import { z } from 'zod'
 
 const TopicUpdateSchema = z.object({
@@ -20,54 +21,45 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await params
-    const topic = await prisma.topic.findUnique({
-      where: { id },
-      include: {
-        _count: {
-          select: { recipes: true }
-        },
-        recipes: {
-          include: {
-            recipe: {
-              include: {
-                author: {
-                  select: {
-                    id: true,
-                    name: true,
-                    avatar: true
-                  }
-                },
-                _count: {
-                  select: {
-                    likes: true,
-                    favorites: true,
-                    comments: true
-                  }
-                }
-              }
-            }
-          },
-          take: 20,
-          orderBy: {
-            recipe: {
-              createdAt: 'desc'
-            }
+    const { id } = await params;
+    const userId = await getUserIdFromToken(request);
+
+    const [topic, followerCount, isFollowing] = await Promise.all([
+      prisma.topic.findUnique({
+        where: { id },
+        include: {
+          _count: {
+            select: { recipes: true }
           }
         }
-      }
-    })
+      }),
+      prisma.topicFollower.count({
+        where: { topicId: id }
+      }),
+      userId ? prisma.topicFollower.findUnique({
+        where: {
+          topicId_userId: {
+            topicId: id,
+            userId
+          }
+        }
+      }) : null
+    ]);
 
     if (!topic) {
       return NextResponse.json(
         errorResponse('Topic not found'),
         { status: 404 }
-      )
+      );
     }
 
-    return NextResponse.json(successResponse(topic))
+    return NextResponse.json(successResponse({
+      ...topic,
+      followerCount,
+      isFollowing: !!isFollowing
+    }));
   } catch (error) {
-    return handleError(error)
+    return handleError(error);
   }
 }
 

@@ -65,3 +65,18 @@ export function verifyAuthToken(token: string): AuthTokenPayload | null {
     return null
   }
 }
+
+/**
+ * 从 Request 的 Authorization header 中提取并验证 JWT token，返回 userId
+ * @param request - Next.js Request 对象
+ * @returns userId (string) 或 null（未授权/token 无效）
+ */
+export async function getUserIdFromToken(request: Request): Promise<string | null> {
+  const authHeader = request.headers.get('authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return null
+  }
+  const token = authHeader.slice(7)
+  const payload = verifyAuthToken(token)
+  return payload?.sub ?? null
+}

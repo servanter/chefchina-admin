@@ -64,6 +64,8 @@ model User {
   reports       Report[]
   badges        UserBadge[]
   browseHistory BrowseHistory[] // REQ-12.7: 浏览历史
+  searchHistory SearchHistory[] // REQ-14.6: 搜索历史
+  topicFollowers TopicFollower[] // REQ-14.4: 话题关注
 
   @@map("users")
 }
@@ -419,6 +421,7 @@ model Topic {
   updatedAt   DateTime      @updatedAt
 
   recipes     RecipeTopic[]
+  followers   TopicFollower[] // REQ-15.1: 话题关注者
 
   @@map("topics")
 }
@@ -513,4 +516,51 @@ model UserBadge {
   @@unique([userId, badgeId])
   @@index([userId])
   @@map("user_badges")
+}
+
+// ─────────────────────────────────────────
+// Batch 14: 搜索历史 & 热门搜索词 & 话题关注
+// ─────────────────────────────────────────
+
+model SearchHistory {
+  id          String   @id @default(cuid())
+  userId      String
+  query       String
+  resultCount Int      @default(0)
+  clicked     Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@map("search_history")
+}
+
+model SearchTrending {
+  id           String   @id @default(cuid())
+  keyword      String
+  searchCount  Int      @default(0)
+  clickRate    Float    @default(0)
+  score        Float    @default(0)
+  trendingType String?  // 'hot' | 'rising' | 'new'
+  hourWindow   DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([hourWindow, score(sort: Desc)])
+  @@map("search_trending")
+}
+
+model TopicFollower {
+  topicId   String
+  userId    String
+  createdAt DateTime @default(now())
+
+  topic     Topic    @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([topicId, userId])
+  @@index([topicId])
+  @@index([userId])
+  @@map("topic_followers")
 }
