@@ -39,8 +39,34 @@ export async function GET(request: Request) {
       })
     );
 
+    // 新增：基于 SearchHistory 统计热门关键词（最近 7 天）
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const keywordStats = await prisma.searchHistory.groupBy({
+      by: ['query'],
+      where: {
+        createdAt: {
+          gte: sevenDaysAgo,
+        },
+        query: {
+          not: '',
+        },
+      },
+      _count: {
+        query: true,
+      },
+      orderBy: {
+        _count: {
+          query: 'desc',
+        },
+      },
+      take: 10,
+    });
+
+    const keywords = keywordStats.map((stat) => stat.query);
+
     return NextResponse.json(successResponse({
       trending: trendingWithType,
+      keywords, // 新增：热门关键词列表
       updatedAt: new Date().toISOString()
     }));
   } catch (error) {
