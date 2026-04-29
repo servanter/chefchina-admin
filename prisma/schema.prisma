@@ -71,6 +71,8 @@ model User {
 
   // REQ-18.5: 性能索引
   @@index([email])     // 邮箱查询（登录）
+  @@index([name])      // 昵称查询（用于去重和搜索）
+  @@index([createdAt]) // 用户列表排序（按注册时间）
   @@map("users")
 }
 

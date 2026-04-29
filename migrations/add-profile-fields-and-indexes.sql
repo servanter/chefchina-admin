@@ -27,3 +27,5 @@ CREATE INDEX "comments_userId_idx" ON "comments"("userId");
 
 -- User 表索引
 CREATE INDEX "users_email_idx" ON "users"("email");
+CREATE INDEX "users_name_idx" ON "users"("name");  -- 昵称查询（用于去重和搜索）
+CREATE INDEX "users_createdAt_idx" ON "users"("createdAt");  -- 用户列表排序（按注册时间）
