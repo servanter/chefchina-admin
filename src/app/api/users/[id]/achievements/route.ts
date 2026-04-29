@@ -159,13 +159,15 @@ export async function POST(
         where: { id: userId },
         select: { exp: true, level: true },
       })
-      const finalLevel = calculateLevel(finalUser.exp)
-      if (finalLevel > initialLevel) {
-        await prisma.user.update({
-          where: { id: userId },
-          data: { level: finalLevel },
-        })
-        leveledUp = true
+      if (finalUser) {
+        const finalLevel = calculateLevel(finalUser.exp)
+        if (finalLevel > initialLevel) {
+          await prisma.user.update({
+            where: { id: userId },
+            data: { level: finalLevel },
+          })
+          leveledUp = true
+        }
       }
     }
 
