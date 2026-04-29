@@ -126,12 +126,18 @@ export async function GET(req: NextRequest) {
       // Batch 2: 用户相关（如果提供了 userId）
       let unreadCount = 0
       if (userId) {
-        unreadCount = await prisma.notification.count({
-          where: {
-            userId,
-            readAt: null,  // 正确字段：readAt 为 null 表示未读
-          },
-        })
+        try {
+          unreadCount = await prisma.notification.count({
+            where: {
+              userId,
+              readAt: null,  // 正确字段：readAt 为 null 表示未读
+            },
+          })
+        } catch (error) {
+          console.error('[home/init] Failed to query notifications:', error);
+          // 降级处理：返回 0
+          unreadCount = 0;
+        }
       }
 
       return {

@@ -25,6 +25,14 @@ export async function GET(request: Request) {
       distinct: ['keyword'] // 去重，同一关键词只取最新的
     });
 
+    // ✅ 新增：如果表为空，直接返回空数组
+    if (!trending || trending.length === 0) {
+      return NextResponse.json(successResponse({
+        trending: [],
+        updatedAt: new Date().toISOString()
+      }));
+    }
+
     // 计算趋势类型
     const trendingWithType = await Promise.all(
       trending.map(async (item) => {
@@ -44,7 +52,12 @@ export async function GET(request: Request) {
       updatedAt: new Date().toISOString()
     }));
   } catch (error) {
-    return handleError(error);
+    console.error('[search/trending] API Error:', error);
+    // ✅ 新增：降级处理，返回空数组而不是 500
+    return NextResponse.json(successResponse({
+      trending: [],
+      updatedAt: new Date().toISOString()
+    }));
   }
 }
 
