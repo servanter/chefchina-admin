@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const ALLOWED_ORIGINS = [
-  'https://chefchina-admin.vercel.app', // 后台管理系统生产环境
+  'https://chefchina-app.vercel.app', // 生产环境
   'http://localhost:8081',   // Expo web
   'http://localhost:19006',  // Expo 旧版 web
   'exp://localhost:8081',    // Expo Go
