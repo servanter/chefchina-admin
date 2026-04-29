@@ -562,13 +562,13 @@ model SearchHistory {
 model SearchTrending {
   id           String   @id @default(cuid())
   keyword      String
-  searchCount  Int      @default(0)
-  clickRate    Float    @default(0)
+  searchCount  Int      @default(0) @map("search_count")
+  clickRate    Float    @default(0) @map("click_rate")
   score        Float    @default(0)
-  trendingType String?  // 'hot' | 'rising' | 'new'
-  hourWindow   DateTime
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  trendingType String?  @map("trending_type") // 'hot' | 'rising' | 'new'
+  hourWindow   DateTime @map("hour_window")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   @@index([hourWindow, score(sort: Desc)])
   @@map("search_trending")
