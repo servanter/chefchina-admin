@@ -11,7 +11,8 @@ export async function GET(request: Request) {
     // 获取最近 24 小时的数据
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-    const trending = await prisma.searchTrending.findMany({
+    // 先获取所有数据，然后在应用层去重
+    const allTrending = await prisma.searchTrending.findMany({
       where: {
         hourWindow: {
           gte: oneDayAgo
@@ -19,16 +20,30 @@ export async function GET(request: Request) {
       },
       orderBy: [
         { score: 'desc' },
-        { searchCount: 'desc' }
-      ],
-      take: limit,
-      distinct: ['keyword'] // 去重，同一关键词只取最新的
+        { searchCount: 'desc' },
+        { hourWindow: 'desc' } // 添加时间排序确保取最新的
+      ]
     });
 
-    // 计算趋势类型
+    // 手动去重：保留每个关键词的第一条（score 最高的）
+    const keywordMap = new Map<string, typeof allTrending[0]>();
+    for (const item of allTrending) {
+      if (!keywordMap.has(item.keyword)) {
+        keywordMap.set(item.keyword, item);
+      }
+    }
+    const trending = Array.from(keywordMap.values()).slice(0, limit);
+
+    // 计算趋势类型（添加错误处理）
     const trendingWithType = await Promise.all(
       trending.map(async (item) => {
-        const trendingType = await calculateTrendingType(item.keyword);
+        let trendingType: 'hot' | 'rising' | 'new' = 'new';
+        try {
+          trendingType = await calculateTrendingType(item.keyword);
+        } catch (error) {
+          console.error(`[search/trending] Failed to calculate trending type for "${item.keyword}":`, error);
+          // 降级：默认为 'new'
+        }
         return {
           keyword: item.keyword,
           searchCount: item.searchCount,
