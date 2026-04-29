@@ -11,16 +11,16 @@ const LEVELS = [
   { level: 5, nameEn: 'Legendary Chef',   nameZh: '传奇大厨',  icon: '🏆', minXp: 5000, maxXp: Infinity },
 ]
 
-function getLevelInfo(level: number, xp: number) {
+function getLevelInfo(level: number, exp: number) {
   const config = LEVELS.find((l) => l.level === level) ?? LEVELS[0]
   const nextLevel = LEVELS.find((l) => l.level === level + 1)
   const nextLevelXp = nextLevel ? nextLevel.minXp : null
   const progress = nextLevelXp
-    ? Math.min(1, (xp - config.minXp) / (nextLevelXp - config.minXp))
+    ? Math.min(1, (exp - config.minXp) / (nextLevelXp - config.minXp))
     : 1
   return {
     level: config.level,
-    xp,
+    exp,
     levelNameEn: config.nameEn,
     levelNameZh: config.nameZh,
     levelIcon: config.icon,
@@ -36,15 +36,14 @@ export async function GET(
 ) {
   try {
     const { id: userId } = await params
-    // 用 as any 因 level/xp 字段未 prisma generate
-    const user = await (prisma as any).user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { level: true, xp: true },
+      select: { level: true, exp: true },
     })
     if (!user) {
       return successResponse(getLevelInfo(1, 0))
     }
-    return successResponse(getLevelInfo(user.level, user.xp))
+    return successResponse(getLevelInfo(user.level, user.exp))
   } catch (error) {
     return handleError(error)
   }
