@@ -3,15 +3,15 @@ import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleError } from '@/lib/api'
 import { requireSelfOrAdmin } from '@/lib/auth-guard'
 
-function calculateLevel(xp: number): number {
-  if (xp >= 5000) return 5
-  if (xp >= 1500) return 4
-  if (xp >= 500) return 3
-  if (xp >= 100) return 2
+function calculateLevel(exp: number): number {
+  if (exp >= 5000) return 5
+  if (exp >= 1500) return 4
+  if (exp >= 500) return 3
+  if (exp >= 100) return 2
   return 1
 }
 
-// POST /api/users/[id]/xp — 增加 XP（内部调用），自动升级
+// POST /api/users/[id]/xp — 增加 EXP（内部调用），自动升级
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -27,20 +27,19 @@ export async function POST(
     const { amount, reason } = body as { amount: number; reason?: string }
 
     if (!amount || amount <= 0) {
-      return errorResponse('Invalid XP amount', 400)
+      return errorResponse('Invalid EXP amount', 400)
     }
 
-    // 用 as any 因 level/xp 字段未 prisma generate
-    const user = await (prisma as any).user.update({
+    const user = await prisma.user.update({
       where: { id: userId },
-      data: { xp: { increment: amount } },
+      data: { exp: { increment: amount } },
     })
 
-    const newLevel = calculateLevel(user.xp)
+    const newLevel = calculateLevel(user.exp)
     let leveledUp = false
 
     if (newLevel > user.level) {
-      await (prisma as any).user.update({
+      await prisma.user.update({
         where: { id: userId },
         data: { level: newLevel },
       })
@@ -48,7 +47,7 @@ export async function POST(
     }
 
     return successResponse({
-      xp: user.xp,
+      exp: user.exp,
       level: leveledUp ? newLevel : user.level,
       leveledUp,
       reason: reason ?? null,

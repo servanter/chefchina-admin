@@ -16,8 +16,8 @@ export async function POST(
     const auth = requireSelfOrAdmin(_req, userId)
     if (auth instanceof Response) return auth
 
-    // 获取用户信息（用 as any 因 level/xp 字段未 prisma generate）
-    const user = await (prisma as any).user.findUnique({
+    // 获取用户信息
+    const user = await prisma.user.findUnique({
       where: { id: userId },
       include: {
         _count: {
@@ -141,10 +141,10 @@ export async function POST(
           })
           newBadges.push(badge)
 
-          // 解锁徽章 +50 XP
-          await (prisma as any).user.update({
+          // 解锁徽章 +50 EXP
+          await prisma.user.update({
             where: { id: userId },
-            data: { xp: { increment: 50 } },
+            data: { exp: { increment: 50 } },
           })
         } catch {
           // unique constraint 说明已存在，跳过
@@ -155,17 +155,19 @@ export async function POST(
     // 全部徽章发完后，统一检查升级（BUG-001 fix）
     let leveledUp = false
     if (newBadges.length > 0) {
-      const finalUser = await (prisma as any).user.findUnique({
+      const finalUser = await prisma.user.findUnique({
         where: { id: userId },
-        select: { xp: true, level: true },
+        select: { exp: true, level: true },
       })
-      const finalLevel = calculateLevel(finalUser.xp)
-      if (finalLevel > initialLevel) {
-        await (prisma as any).user.update({
-          where: { id: userId },
-          data: { level: finalLevel },
-        })
-        leveledUp = true
+      if (finalUser) {
+        const finalLevel = calculateLevel(finalUser.exp)
+        if (finalLevel > initialLevel) {
+          await prisma.user.update({
+            where: { id: userId },
+            data: { level: finalLevel },
+          })
+          leveledUp = true
+        }
       }
     }
 
@@ -175,10 +177,10 @@ export async function POST(
   }
 }
 
-function calculateLevel(xp: number): number {
-  if (xp >= 5000) return 5
-  if (xp >= 1500) return 4
-  if (xp >= 500) return 3
-  if (xp >= 100) return 2
+function calculateLevel(exp: number): number {
+  if (exp >= 5000) return 5
+  if (exp >= 1500) return 4
+  if (exp >= 500) return 3
+  if (exp >= 100) return 2
   return 1
 }
