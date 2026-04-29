@@ -41,6 +41,8 @@ model User {
   specialties    String[] // REQ-12.4: 擅长菜系（多选）
   role           UserRole @default(USER)
   locale         String   @default("en")
+  location       String?  // REQ-18.1: 所在地
+  gender         UserGender? // REQ-18.1: 性别
   expoPushToken  String?
   passwordHash   String?
   loginAttempts  Int      @default(0)
@@ -67,12 +69,23 @@ model User {
   searchHistory SearchHistory[] // REQ-14.6: 搜索历史
   topicFollowers TopicFollower[] // REQ-14.4: 话题关注
 
+  // REQ-18.5: 性能索引
+  @@index([email])     // 邮箱查询（登录）
+  @@index([name])      // 昵称查询（用于去重和搜索）
+  @@index([createdAt]) // 用户列表排序（按注册时间）
   @@map("users")
 }
 
 enum UserRole {
   USER
   ADMIN
+}
+
+enum UserGender {
+  MALE
+  FEMALE
+  OTHER
+  PRIVATE
 }
 
 // ─────────────────────────────────────────
@@ -133,6 +146,13 @@ model Recipe {
   topics        RecipeTopic[] // REQ-12.3: 话题关联
   browseHistory BrowseHistory[] // REQ-12.7: 浏览历史
 
+  // REQ-18.5: 性能索引
+  @@index([authorId])           // 用户的菜谱列表
+  @@index([categoryId])         // 分类筛选
+  @@index([createdAt])          // 最新菜谱排序
+  @@index([viewCount])          // 热门排行
+  @@index([isPublished])        // 已发布/草稿筛选
+  @@index([authorId, createdAt]) // 组合索引：用户菜谱按时间排序
   @@map("recipes")
 }
 
@@ -224,6 +244,9 @@ model Comment {
   replies   Comment[]   @relation("CommentReplies")
   likes     CommentLike[]
 
+  // REQ-18.5: 性能索引
+  @@index([recipeId, createdAt]) // 菜谱评论按时间排序
+  @@index([userId])              // 用户的评论列表
   @@map("comments")
 }
 
