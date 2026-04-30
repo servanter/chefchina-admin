@@ -31,6 +31,9 @@ export async function GET(req: NextRequest) {
     const q = normalize(rawQ)
     const cursor = searchParams.get('cursor') || undefined
     const limitParam = Number(searchParams.get('limit') || DEFAULT_LIMIT)
+    const category = searchParams.get('category')?.trim() || undefined
+    const tag = searchParams.get('tag')?.trim() || undefined
+    const sort = searchParams.get('sort')?.trim() || 'relevance'
     const limit = Math.min(Math.max(Number.isFinite(limitParam) ? limitParam : DEFAULT_LIMIT, 1), MAX_LIMIT)
     // BUG-002 修复：userId 不再从 query 取（防止伪造污染 SearchLog），
     // 改从 JWT payload 抽取；匿名用户（未登录）仍可搜，userId 写 null。
@@ -50,9 +53,39 @@ export async function GET(req: NextRequest) {
     // Prisma where：OR 分支覆盖 title + ingredient
     const where = {
       isPublished: true,
+      ...(category
+        ? {
+            category: {
+              OR: [
+                { nameEn: { contains: category, mode: 'insensitive' as const } },
+                { nameZh: { contains: category, mode: 'insensitive' as const } },
+              ],
+            },
+          }
+        : {}),
+      ...(tag
+        ? {
+            tags: {
+              some: {
+                tag: {
+                  OR: [
+                    { nameEn: { contains: tag, mode: 'insensitive' as const } },
+                    { nameZh: { contains: tag, mode: 'insensitive' as const } },
+                  ],
+                },
+              },
+            },
+          }
+        : {}),
       OR: [
         { titleEn: { contains: q, mode: 'insensitive' as const } },
         { titleZh: { contains: q, mode: 'insensitive' as const } },
+        {
+          descriptionEn: { contains: q, mode: 'insensitive' as const },
+        },
+        {
+          descriptionZh: { contains: q, mode: 'insensitive' as const },
+        },
         {
           ingredients: {
             some: {
@@ -60,6 +93,18 @@ export async function GET(req: NextRequest) {
                 { nameEn: { contains: q, mode: 'insensitive' as const } },
                 { nameZh: { contains: q, mode: 'insensitive' as const } },
               ],
+            },
+          },
+        },
+        {
+          tags: {
+            some: {
+              tag: {
+                OR: [
+                  { nameEn: { contains: q, mode: 'insensitive' as const } },
+                  { nameZh: { contains: q, mode: 'insensitive' as const } },
+                ],
+              },
             },
           },
         },
@@ -71,9 +116,15 @@ export async function GET(req: NextRequest) {
       where,
       take: limit + 1,
       ...(cursor && { cursor: { id: cursor }, skip: 1 }),
-      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      orderBy:
+        sort === 'latest'
+          ? [{ createdAt: 'desc' }, { id: 'desc' }]
+          : sort === 'hot' || sort === 'popular'
+            ? [{ viewCount: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }]
+            : [{ createdAt: 'desc' }, { id: 'desc' }],
       include: {
         category: { select: { id: true, nameEn: true, nameZh: true, slug: true } },
+        tags: { include: { tag: true } },
         _count: { select: { likes: true, comments: true, favorites: true } },
       },
     })
