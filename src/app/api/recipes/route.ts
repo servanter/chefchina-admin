@@ -170,19 +170,28 @@ export async function GET(req: NextRequest) {
         )
         const recipeMap = new Map(recipes.map((recipe) => [recipe.id, recipe]))
 
+        const data = rankedIds
+          .map((id) => {
+            const recipe = recipeMap.get(id)
+            if (!recipe) return null
+            return {
+              ...recipe,
+              avgRating: ratingMap.get(id)?.avg ?? 0,
+              ratingsCount: ratingMap.get(id)?.count ?? 0,
+            }
+          })
+          .filter(Boolean)
         return {
-          recipes: rankedIds
-            .map((id) => {
-              const recipe = recipeMap.get(id)
-              if (!recipe) return null
-              return {
-                ...recipe,
-                avgRating: ratingMap.get(id)?.avg ?? 0,
-                ratingsCount: ratingMap.get(id)?.count ?? 0,
-              }
-            })
-            .filter(Boolean),
-          pagination: { page, pageSize: take, total, totalPages: Math.ceil(total / take) },
+          recipes: data,
+          data,
+          pagination: {
+            page,
+            limit: take,
+            pageSize: take,
+            total,
+            totalPages: Math.ceil(total / take),
+            hasMore: skip + data.length < total,
+          },
         }
       }
 
@@ -208,13 +217,23 @@ export async function GET(req: NextRequest) {
         ratingStats.map((s) => [s.recipeId, { avg: s._avg.rating ?? 0, count: s._count.rating }])
       )
 
+      const data = recipes.map((r) => ({
+        ...r,
+        avgRating: ratingMap.get(r.id)?.avg ?? 0,
+        ratingsCount: ratingMap.get(r.id)?.count ?? 0,
+      }))
+
       return {
-        recipes: recipes.map((r) => ({
-          ...r,
-          avgRating: ratingMap.get(r.id)?.avg ?? 0,
-          ratingsCount: ratingMap.get(r.id)?.count ?? 0,
-        })),
-        pagination: { page, pageSize: take, total, totalPages: Math.ceil(total / take) },
+        recipes: data,
+        data,
+        pagination: {
+          page,
+          limit: take,
+          pageSize: take,
+          total,
+          totalPages: Math.ceil(total / take),
+          hasMore: skip + data.length < total,
+        },
       }
     })
 

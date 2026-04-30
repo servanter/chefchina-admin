@@ -33,13 +33,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       prisma.follow.count({ where: { followingId: userId } }),
     ])
 
+    const data = followers.map(f => f.follower)
     const result = {
-      followers: followers.map(f => f.follower),
+      followers: data,
+      data,
       pagination: {
         page,
+        limit: take,
         pageSize: take,
         total,
         totalPages: Math.ceil(total / take),
+        hasMore: skip + data.length < total,
       },
     }
 
