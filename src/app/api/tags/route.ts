@@ -6,7 +6,10 @@ import { successResponse, handleError } from '@/lib/api'
 export async function GET(_req: NextRequest) {
   try {
     const tags = await prisma.tag.findMany({
-      orderBy: { nameEn: 'asc' },
+      orderBy: [
+        { recipes: { _count: 'desc' } },
+        { nameEn: 'asc' },
+      ],
       include: {
         _count: { select: { recipes: true } },
       },
