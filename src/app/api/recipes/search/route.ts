@@ -33,7 +33,8 @@ export async function GET(req: NextRequest) {
     const limitParam = Number(searchParams.get('limit') || DEFAULT_LIMIT)
     const category = searchParams.get('category')?.trim() || undefined
     const tag = searchParams.get('tag')?.trim() || undefined
-    const sort = searchParams.get('sort')?.trim() || 'relevance'
+    const rawSort = searchParams.get('sort')?.trim() || 'newest'
+    const sort = rawSort === 'relevance' ? 'newest' : rawSort
     const limit = Math.min(Math.max(Number.isFinite(limitParam) ? limitParam : DEFAULT_LIMIT, 1), MAX_LIMIT)
     // BUG-002 修复：userId 不再从 query 取（防止伪造污染 SearchLog），
     // 改从 JWT payload 抽取；匿名用户（未登录）仍可搜，userId 写 null。
@@ -117,7 +118,7 @@ export async function GET(req: NextRequest) {
       take: limit + 1,
       ...(cursor && { cursor: { id: cursor }, skip: 1 }),
       orderBy:
-        sort === 'latest'
+        sort === 'latest' || sort === 'newest'
           ? [{ createdAt: 'desc' }, { id: 'desc' }]
           : sort === 'hot' || sort === 'popular'
             ? [{ viewCount: 'desc' }, { createdAt: 'desc' }, { id: 'desc' }]
