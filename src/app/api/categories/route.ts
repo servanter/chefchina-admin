@@ -17,11 +17,25 @@ export async function GET() {
   try {
     const categories = await withCache('categories:all', CACHE_TTL.categories, () =>
       prisma.category.findMany({
-        orderBy: { sortOrder: 'asc' },
+        orderBy: [
+          { recipes: { _count: 'desc' } },
+          { sortOrder: 'asc' },
+          { nameEn: 'asc' },
+        ],
         include: { _count: { select: { recipes: true } } },
       })
     )
-    return successResponse(categories)
+
+    return successResponse({
+      data: categories.map((category) => ({
+        id: category.id,
+        name: category.nameEn,
+        nameZh: category.nameZh,
+        icon: category.image,
+        recipeCount: category._count.recipes,
+        slug: category.slug,
+      })),
+    })
   } catch (error) {
     return handleError(error)
   }
