@@ -13,6 +13,7 @@ const RecipeCreateSchema = z.object({
   coverImage: z.string().url().optional(),
   // 需求 15：4 个 meta 字段均允许未填（落 NULL）。
   difficulty: z.enum(['EASY', 'MEDIUM', 'HARD']).optional().nullable(),
+  prepTime: z.number().int().positive().optional().nullable(),
   cookTimeMin: z.number().int().positive().optional().nullable(),
   servings: z.number().int().positive().optional().nullable(),
   calories: z.number().int().nonnegative().optional().nullable(),
@@ -169,19 +170,28 @@ export async function GET(req: NextRequest) {
         )
         const recipeMap = new Map(recipes.map((recipe) => [recipe.id, recipe]))
 
+        const data = rankedIds
+          .map((id) => {
+            const recipe = recipeMap.get(id)
+            if (!recipe) return null
+            return {
+              ...recipe,
+              avgRating: ratingMap.get(id)?.avg ?? 0,
+              ratingsCount: ratingMap.get(id)?.count ?? 0,
+            }
+          })
+          .filter(Boolean)
         return {
-          recipes: rankedIds
-            .map((id) => {
-              const recipe = recipeMap.get(id)
-              if (!recipe) return null
-              return {
-                ...recipe,
-                avgRating: ratingMap.get(id)?.avg ?? 0,
-                ratingsCount: ratingMap.get(id)?.count ?? 0,
-              }
-            })
-            .filter(Boolean),
-          pagination: { page, pageSize: take, total, totalPages: Math.ceil(total / take) },
+          recipes: data,
+          data,
+          pagination: {
+            page,
+            limit: take,
+            pageSize: take,
+            total,
+            totalPages: Math.ceil(total / take),
+            hasMore: skip + data.length < total,
+          },
         }
       }
 
@@ -207,13 +217,23 @@ export async function GET(req: NextRequest) {
         ratingStats.map((s) => [s.recipeId, { avg: s._avg.rating ?? 0, count: s._count.rating }])
       )
 
+      const data = recipes.map((r) => ({
+        ...r,
+        avgRating: ratingMap.get(r.id)?.avg ?? 0,
+        ratingsCount: ratingMap.get(r.id)?.count ?? 0,
+      }))
+
       return {
-        recipes: recipes.map((r) => ({
-          ...r,
-          avgRating: ratingMap.get(r.id)?.avg ?? 0,
-          ratingsCount: ratingMap.get(r.id)?.count ?? 0,
-        })),
-        pagination: { page, pageSize: take, total, totalPages: Math.ceil(total / take) },
+        recipes: data,
+        data,
+        pagination: {
+          page,
+          limit: take,
+          pageSize: take,
+          total,
+          totalPages: Math.ceil(total / take),
+          hasMore: skip + data.length < total,
+        },
       }
     })
 
@@ -231,7 +251,13 @@ export async function POST(req: NextRequest) {
     if (auth instanceof Response) return auth
 
     const body = await req.json()
-    const data = RecipeCreateSchema.parse(body)
+    const normalizedBody = {
+      ...body,
+      prepTime: body.prepTime ?? null,
+      cookTimeMin: body.cookTimeMin ?? body.cookTime ?? null,
+      difficulty: body.difficulty ?? null,
+    }
+    const data = RecipeCreateSchema.parse(normalizedBody)
     const { steps, ingredients, tagIds, topicIds, ...recipeData } = data
 
     const recipe = await prisma.recipe.create({

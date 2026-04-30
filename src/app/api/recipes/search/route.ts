@@ -163,7 +163,14 @@ export async function GET(req: NextRequest) {
 
     return successResponse({
       items,
-      pagination: { nextCursor, ...(total !== undefined ? { total } : {}) },
+      data: items,
+      pagination: {
+        page: cursor ? undefined : 1,
+        limit,
+        total: total ?? items.length,
+        hasMore: nextCursor !== null,
+        nextCursor,
+      },
     })
   } catch (error) {
     return handleError(error)

@@ -119,6 +119,7 @@ model Recipe {
   // `chefchina-app/app/recipe/[id].tsx` 的 meta bar）。旧种子数据会保留原值，
   // 新增菜谱可以在编辑表单中留空。
   difficulty    Difficulty?
+  prepTime      Int?
   cookTimeMin   Int?
   servings      Int?
   calories      Int?

@@ -13,6 +13,7 @@ const UpdateSchema = z.object({
   coverImage: z.string().url().optional().nullable(),
   // 需求 15：以下四个字段均可留空（App 详情页按 null 隐藏对应 icon）
   difficulty: z.enum(['EASY', 'MEDIUM', 'HARD']).optional().nullable(),
+  prepTime: z.number().int().positive().optional().nullable(),
   cookTimeMin: z.number().int().positive().optional().nullable(),
   servings: z.number().int().positive().optional().nullable(),
   calories: z.number().int().nonnegative().optional().nullable(),
@@ -115,7 +116,13 @@ export async function PATCH(
     }
 
     const body = await req.json()
-    const data = UpdateSchema.parse(body)
+    const normalizedBody = {
+      ...body,
+      ...(Object.prototype.hasOwnProperty.call(body, 'prepTime') ? { prepTime: body.prepTime } : {}),
+      ...(Object.prototype.hasOwnProperty.call(body, 'cookTime') ? { cookTimeMin: body.cookTime } : {}),
+      ...(Object.prototype.hasOwnProperty.call(body, 'difficulty') ? { difficulty: body.difficulty } : {}),
+    }
+    const data = UpdateSchema.parse(normalizedBody)
     const { steps, ingredients, tagIds, topicIds, updatedAt: clientUpdatedAt, ...recipeData } = data
 
     // BUG-002: 乐观锁 — 客户端传入 updatedAt 与数据库比对
