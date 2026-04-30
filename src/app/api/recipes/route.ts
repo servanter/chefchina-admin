@@ -13,6 +13,7 @@ const RecipeCreateSchema = z.object({
   coverImage: z.string().url().optional(),
   // 需求 15：4 个 meta 字段均允许未填（落 NULL）。
   difficulty: z.enum(['EASY', 'MEDIUM', 'HARD']).optional().nullable(),
+  prepTime: z.number().int().positive().optional().nullable(),
   cookTimeMin: z.number().int().positive().optional().nullable(),
   servings: z.number().int().positive().optional().nullable(),
   calories: z.number().int().nonnegative().optional().nullable(),
@@ -231,7 +232,13 @@ export async function POST(req: NextRequest) {
     if (auth instanceof Response) return auth
 
     const body = await req.json()
-    const data = RecipeCreateSchema.parse(body)
+    const normalizedBody = {
+      ...body,
+      prepTime: body.prepTime ?? null,
+      cookTimeMin: body.cookTimeMin ?? body.cookTime ?? null,
+      difficulty: body.difficulty ?? null,
+    }
+    const data = RecipeCreateSchema.parse(normalizedBody)
     const { steps, ingredients, tagIds, topicIds, ...recipeData } = data
 
     const recipe = await prisma.recipe.create({
