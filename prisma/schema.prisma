@@ -227,26 +227,29 @@ model RecipeTag {
 // 评论
 // ─────────────────────────────────────────
 model Comment {
-  id        String   @id @default(cuid())
-  content   String
-  rating    Int?     // 1-5 星
-  images    String[] // 评论图片数组（存储 base64 或 URL）
-  recipeId  String
-  userId    String
-  parentId  String?  // 楼中楼回复（最多 2 层）
-  isVisible Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id            String   @id @default(cuid())
+  content       String
+  rating        Int?     // 1-5 星
+  images        String[] // 评论图片数组（存储 base64 或 URL）
+  recipeId      String
+  userId        String
+  parentId      String?  // 楼中楼回复（最多 2 层）
+  replyToUserId String?  // 直接回复给谁
+  isVisible     Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  recipe    Recipe      @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  user      User        @relation(fields: [userId], references: [id])
-  parent    Comment?    @relation("CommentReplies", fields: [parentId], references: [id])
-  replies   Comment[]   @relation("CommentReplies")
-  likes     CommentLike[]
+  recipe        Recipe      @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id])
+  parent        Comment?    @relation("CommentReplies", fields: [parentId], references: [id])
+  replies       Comment[]   @relation("CommentReplies")
+  likes         CommentLike[]
 
   // REQ-18.5: 性能索引
   @@index([recipeId, createdAt]) // 菜谱评论按时间排序
   @@index([userId])              // 用户的评论列表
+  @@index([parentId])
+  @@index([replyToUserId])
   @@map("comments")
 }
 

@@ -24,7 +24,11 @@ export async function GET(
 
     const current = await prisma.recipe.findUnique({
       where: { id },
-      select: { id: true, categoryId: true },
+      select: {
+        id: true,
+        categoryId: true,
+        tags: { select: { tagId: true } },
+      },
     })
     if (!current) return errorResponse('Recipe not found', 404)
 
@@ -33,10 +37,15 @@ export async function GET(
       const recipes = await prisma.recipe.findMany({
         where: {
           isPublished: true,
-          categoryId: current.categoryId,
           id: { not: current.id },
+          OR: [
+            { categoryId: current.categoryId },
+            ...(current.tags.length > 0
+              ? [{ tags: { some: { tagId: { in: current.tags.map((t) => t.tagId) } } } }]
+              : []),
+          ],
         },
-        orderBy: [{ viewCount: 'desc' }, { createdAt: 'desc' }],
+        orderBy: [{ viewCount: 'desc' }, { favorites: { _count: 'desc' } }, { createdAt: 'desc' }],
         take: limit,
         include: {
           category: { select: { id: true, nameEn: true, nameZh: true, slug: true } },

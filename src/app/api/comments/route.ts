@@ -13,6 +13,7 @@ const CommentSchema = z.object({
   recipeId: z.string(),
   userId: z.string().optional(),
   parentId: z.string().nullable().optional(),
+  replyToUserId: z.string().nullable().optional(),
 })
 
 export async function GET(req: NextRequest) {
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
           where,
           take,
           skip,
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: 'asc' },
           include: {
             recipe: { select: { id: true, titleZh: true, titleEn: true } },
             user: { select: { id: true, name: true, avatar: true } },
@@ -107,7 +108,12 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json()
     const parsed = CommentSchema.parse(body)
-    const data = { ...parsed, userId, parentId: parsed.parentId ?? undefined }
+    const data = {
+      ...parsed,
+      userId,
+      parentId: parsed.parentId ?? undefined,
+      replyToUserId: parsed.replyToUserId ?? undefined,
+    }
 
     const comment = await prisma.comment.create({
       data,
@@ -122,6 +128,9 @@ export async function POST(req: NextRequest) {
           where: { id: data.parentId },
           select: { userId: true, recipeId: true },
         })
+        if (parent && parent.recipeId !== data.recipeId) {
+          return errorResponse('parent comment does not belong to recipe', 400)
+        }
         if (parent && parent.userId !== userId) {
           const recipe = await prisma.recipe.findUnique({
             where: { id: parent.recipeId },
@@ -144,6 +153,7 @@ export async function POST(req: NextRequest) {
               recipeTitleZh: recipe?.titleZh ?? '',
               commentId: comment.id,
               parentId: data.parentId,
+              replyToUserId: data.replyToUserId ?? parent.userId,
               fromUserId: userId,
             },
           })
