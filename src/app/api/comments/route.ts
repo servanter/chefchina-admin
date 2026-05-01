@@ -115,6 +115,19 @@ export async function POST(req: NextRequest) {
       replyToUserId: parsed.replyToUserId ?? undefined,
     }
 
+    if (data.parentId) {
+      const parent = await prisma.comment.findUnique({
+        where: { id: data.parentId },
+        select: { id: true, userId: true, recipeId: true },
+      })
+      if (!parent) {
+        return errorResponse('Parent comment not found', 404)
+      }
+      if (parent.recipeId !== data.recipeId) {
+        return errorResponse('parent comment does not belong to recipe', 400)
+      }
+    }
+
     const comment = await prisma.comment.create({
       data,
       include: {
@@ -128,9 +141,6 @@ export async function POST(req: NextRequest) {
           where: { id: data.parentId },
           select: { userId: true, recipeId: true },
         })
-        if (parent && parent.recipeId !== data.recipeId) {
-          return errorResponse('parent comment does not belong to recipe', 400)
-        }
         if (parent && parent.userId !== userId) {
           const recipe = await prisma.recipe.findUnique({
             where: { id: parent.recipeId },
@@ -163,7 +173,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    await invalidateCache([`comments:${data.recipeId}:*`, 'comments:all:*'])
+    await invalidateCache([`comments:${data.recipeId}:*`, 'comments:all:*', `recipe-detail-full:${data.recipeId}:*`])
     return successResponse(comment, 201)
   } catch (error) {
     return handleError(error)
