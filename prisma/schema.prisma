@@ -551,11 +551,11 @@ model UserBadge {
 
 model SearchHistory {
   id          String   @id @default(cuid())
-  userId      String
+  userId      String   @map("user_id")
   query       String
-  resultCount Int      @default(0)
+  resultCount Int      @default(0) @map("result_count")
   clicked     Boolean  @default(false)
-  createdAt   DateTime @default(now())
+  createdAt   DateTime @default(now()) @map("created_at")
 
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
