@@ -1,19 +1,21 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * Image Proxy API
  * 
- * 解决外部图片 CORS 跨域问题（pravatar.cc, Unsplash 等）
+ * 解决外部图片 CORS 跨域问题
+ * 支持：pravatar.cc, Unsplash, picsum 等
  * 
  * Usage:
+ *   /api/image/proxy?url=https://images.unsplash.com/photo-xxx
  *   /api/image/proxy?url=https://i.pravatar.cc/150?u=guest
  */
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const url = searchParams.get('url');
+    const searchParams = request.nextUrl.searchParams;
+    const imageUrl = searchParams.get('url');
 
-    if (!url) {
+    if (!imageUrl) {
       return NextResponse.json(
         { success: false, error: 'Missing url parameter' },
         { status: 400 }
@@ -24,13 +26,14 @@ export async function GET(request: Request) {
     const allowedDomains = [
       'i.pravatar.cc',
       'images.unsplash.com',
+      'unsplash.com',
       'source.unsplash.com',
       'picsum.photos',
     ];
 
     let targetUrl: URL;
     try {
-      targetUrl = new URL(url);
+      targetUrl = new URL(imageUrl);
     } catch {
       return NextResponse.json(
         { success: false, error: 'Invalid URL' },
@@ -58,8 +61,8 @@ export async function GET(request: Request) {
       );
     }
 
-    // 获取图片
-    const response = await fetch(url, {
+    // 代理请求
+    const response = await fetch(imageUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; ChefChina/1.0)',
       },
@@ -72,11 +75,13 @@ export async function GET(request: Request) {
       );
     }
 
-    const buffer = await response.arrayBuffer();
+    // 获取图片内容
+    const imageBuffer = await response.arrayBuffer();
     const contentType = response.headers.get('content-type') || 'image/jpeg';
 
     // 返回图片
-    return new NextResponse(buffer, {
+    return new NextResponse(imageBuffer, {
+      status: 200,
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'public, max-age=31536000, immutable',
@@ -90,4 +95,16 @@ export async function GET(request: Request) {
       { status: 500 }
     );
   }
+}
+
+// 支持 OPTIONS 请求（CORS 预检）
+export async function OPTIONS() {
+  return new NextResponse(null, {
+    status: 200,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+    },
+  });
 }
