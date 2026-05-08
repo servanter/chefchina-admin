@@ -1,6 +1,6 @@
 /**
  * AI 营养建议服务
- * 使用阿里云通义千问大模型
+ * 使用 DeepSeek V4 Flash 大模型
  */
 
 import OpenAI from 'openai'
@@ -24,16 +24,16 @@ export interface WeeklyData {
   daysRecorded: number
 }
 
-// 阿里云通义千问配置
+// DeepSeek 配置
 const client = new OpenAI({
-  apiKey: 'sk-5c764e2fece140d8aeb0fccaaa59ca73',
-  baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  apiKey: process.env.DEEPSEEK_API_KEY || 'sk-your-deepseek-api-key',
+  baseURL: 'https://api.deepseek.com/v1',
 })
 
-const MODEL = 'qwen-max'
+const MODEL = 'deepseek-v4-flash'
 
 /**
- * 调用通义千问生成建议
+ * 调用 DeepSeek 生成建议
  */
 async function callAI(prompt: string): Promise<{ content: string; source: 'ai' | 'rule' }> {
   try {
