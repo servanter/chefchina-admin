@@ -11,10 +11,11 @@ export async function POST(req: NextRequest) {
     const userId = auth.sub
 
     const body = await req.json()
-    const { recipeId, mealType, servings = 1.0 } = body
+    const { mealType, servings = 1.0 } = body
+    const recipeId = body.recipeId?.toString()  // 确保是 string
 
     // 验证
-    if (!recipeId) {
+    if (!recipeId || recipeId === 'NaN' || recipeId === 'undefined' || recipeId === 'null') {
       return errorResponse('recipeId is required', 400)
     }
 
