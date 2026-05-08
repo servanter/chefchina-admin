@@ -1,6 +1,6 @@
 /**
  * AI 营养建议服务
- * 使用阿里云通义千问大模型
+ * 使用 DeepSeek V4 Flash 大模型
  */
 
 import OpenAI from 'openai'
@@ -24,18 +24,18 @@ export interface WeeklyData {
   daysRecorded: number
 }
 
-// 阿里云通义千问配置
+// DeepSeek 配置
 const client = new OpenAI({
-  apiKey: 'sk-5c764e2fece140d8aeb0fccaaa59ca73',
-  baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+  apiKey: process.env.DEEPSEEK_API_KEY || 'sk-your-deepseek-api-key',
+  baseURL: 'https://api.deepseek.com/v1',
 })
 
-const MODEL = 'qwen-max'
+const MODEL = 'deepseek-v4-flash'
 
 /**
- * 调用通义千问生成建议
+ * 调用 DeepSeek 生成建议
  */
-async function callAI(prompt: string): Promise<string> {
+async function callAI(prompt: string): Promise<{ content: string; source: 'ai' | 'rule' }> {
   try {
     const response = await client.chat.completions.create({
       model: MODEL,
@@ -53,12 +53,70 @@ async function callAI(prompt: string): Promise<string> {
       max_tokens: 200,
     })
 
-    return response.choices[0]?.message?.content?.trim() || '暂无建议'
+    return {
+      content: response.choices[0]?.message?.content?.trim() || '暂无建议',
+      source: 'ai'
+    }
   } catch (error) {
     console.error('AI 调用失败:', error)
-    // 降级到简单规则
-    return '建议保持均衡饮食，适量运动，规律作息。'
+    // 使用提示词中的数据生成规则建议
+    return {
+      content: generateRuleBasedAdvice(prompt),
+      source: 'rule'
+    }
   }
+}
+
+/**
+ * 规则生成建议(AI 调用失败时的降级方案)
+ */
+function generateRuleBasedAdvice(prompt: string): string {
+  // 从 prompt 中提取关键数据
+  const goalMatch = prompt.match(/目标：(\S+)/)
+  const targetCalMatch = prompt.match(/目标热量：(\d+)/)
+  const avgCalMatch = prompt.match(/平均每日热量：(\d+)/)
+  const daysOnTargetMatch = prompt.match(/达标天数：(\d+)/)
+  const daysRecordedMatch = prompt.match(/共记录 (\d+) 天/)
+  
+  const goal = goalMatch ? goalMatch[1] : '健康饮食'
+  const targetCal = targetCalMatch ? parseInt(targetCalMatch[1]) : 2000
+  const avgCal = avgCalMatch ? parseInt(avgCalMatch[1]) : 0
+  const daysOnTarget = daysOnTargetMatch ? parseInt(daysOnTargetMatch[1]) : 0
+  const daysRecorded = daysRecordedMatch ? parseInt(daysRecordedMatch[1]) : 0
+  
+  const suggestions: string[] = []
+  
+  // 规则 1: 热量达标情况
+  const calDiff = avgCal - targetCal
+  if (Math.abs(calDiff) < targetCal * 0.1) {
+    suggestions.push('热量控制得很好,继续保持!')
+  } else if (calDiff < 0) {
+    suggestions.push(`平均热量偏低${Math.abs(calDiff)}kcal,建议增加健康零食如坚果、酸奶`)
+  } else {
+    suggestions.push(`平均热量偏高${calDiff}kcal,注意控制油脂和糖分摄入`)
+  }
+  
+  // 规则 2: 达标天数
+  const targetRate = daysRecorded > 0 ? daysOnTarget / daysRecorded : 0
+  if (targetRate >= 0.7) {
+    suggestions.push('本周达标率不错,坚持下去!')
+  } else if (targetRate >= 0.4) {
+    suggestions.push('建议提前规划饮食,每天预留100-200kcal弹性空间')
+  } else {
+    suggestions.push('饮食波动较大,建议设定固定用餐时间和份量')
+  }
+  
+  // 规则 3: 目标特定建议
+  if (goal.includes('减脂')) {
+    suggestions.push('减脂期建议高蛋白低脂,多吃鸡胸肉、鱼类')
+  } else if (goal.includes('增肌')) {
+    suggestions.push('增肌期保证蛋白质摄入,训练后补充碳水')
+  } else {
+    suggestions.push('保持均衡饮食,适量运动,规律作息')
+  }
+  
+  // 返回前两条建议
+  return suggestions.slice(0, 2).join(' ')
 }
 
 /**
@@ -67,13 +125,16 @@ async function callAI(prompt: string): Promise<string> {
 export async function generateWeeklyAdvice(
   profile: NutritionProfile,
   weeklyData: WeeklyData
-): Promise<string> {
+): Promise<{ content: string; source: 'ai' | 'rule' }> {
   const { goal, dailyCalories, proteinPercent, fatPercent, carbsPercent } = profile
   const { weekTotal, daysOnTarget, daysRecorded } = weeklyData
 
   // 没有记录数据时的快速返回
   if (daysRecorded === 0) {
-    return '本周还没有记录数据，开始记录你的饮食吧！📝'
+    return {
+      content: '本周还没有记录数据，开始记录你的饮食吧！📝',
+      source: 'rule'
+    }
   }
 
   // 计算平均值
@@ -120,7 +181,7 @@ export async function generateDailyAdvice(
     fat: number
     carbs: number
   }
-): Promise<string> {
+): Promise<{ content: string; source: 'ai' | 'rule' }> {
   const { goal, dailyCalories, proteinPercent } = profile
   const { calories, protein, fat, carbs } = currentIntake
 
@@ -163,7 +224,7 @@ export async function generateRecipeRecommendation(
     fat: number
     carbs: number
   }
-): Promise<string> {
+): Promise<{ content: string; source: 'ai' | 'rule' }> {
   const { goal, dailyCalories } = profile
 
   const goalMap: Record<string, string> = {
@@ -200,7 +261,7 @@ export async function analyzeRecipeNutrition(recipe: {
   carbs: number
   fiber?: number
   sodium?: number
-}): Promise<string> {
+}): Promise<{ content: string; source: 'ai' | 'rule' }> {
   const prompt = `
 菜谱名称：${recipe.name}
 营养成分（每份）：
