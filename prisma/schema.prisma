@@ -68,6 +68,9 @@ model User {
   browseHistory BrowseHistory[] // REQ-12.7: 浏览历史
   searchHistory SearchHistory[] // REQ-14.6: 搜索历史
   topicFollowers TopicFollower[] // REQ-14.4: 话题关注
+  healthProfile UserHealthProfile? // SPRINT-004: 健康档案
+  dailyIntakes  DailyIntake[]      // SPRINT-004: 每日摄入
+  nutritionReports NutritionReport[] // SPRINT-004: 周报告
 
   // REQ-18.5: 性能索引
   @@index([email])     // 邮箱查询（登录）
@@ -146,6 +149,7 @@ model Recipe {
   tags          RecipeTag[]
   topics        RecipeTopic[] // REQ-12.3: 话题关联
   browseHistory BrowseHistory[] // REQ-12.7: 浏览历史
+  dailyIntakes  DailyIntake[]   // SPRINT-004: 每日摄入关联
 
   // REQ-18.5: 性能索引
   @@index([authorId])           // 用户的菜谱列表
@@ -590,4 +594,68 @@ model TopicFollower {
   @@index([topicId])
   @@index([userId])
   @@map("topic_followers")
+}
+
+// ─────────────────────────────────────────
+// SPRINT-004: 个性化营养档案
+// ─────────────────────────────────────────
+
+// 1. 用户健康档案
+model UserHealthProfile {
+  userId          String   @id
+  goal            String   // weight_loss/muscle_gain/maintain
+  dailyCalories   Int      // 1200-3000
+  proteinPercent  Int      // 20-40
+  fatPercent      Int      // 20-35
+  carbsPercent    Int      // 30-60
+  sodiumLimit     Int?     // mg
+  sugarLimit      Int?     // g
+  fiberMin        Int?     // g
+  restrictions    String[] // ["low_sodium", "low_sugar"]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_health_profiles")
+}
+
+// 2. 每日摄入记录
+model DailyIntake {
+  id        String   @id @default(cuid())
+  userId    String
+  date      DateTime @db.Date
+  recipeId  String
+  mealType  String   // breakfast/lunch/dinner/snack
+  servings  Float    @default(1.0)
+  calories  Float
+  protein   Float
+  fat       Float
+  carbs     Float
+  fiber     Float?
+  sodium    Float?
+  sugar     Float?
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@index([userId, date])
+  @@map("daily_intakes")
+}
+
+// 3. 周营养报告
+model NutritionReport {
+  id           String   @id @default(cuid())
+  userId       String
+  weekStart    DateTime @db.Date
+  weekEnd      DateTime @db.Date
+  reportData   Json     // 统计数据
+  aiAdvice     String?  // AI 建议（暂时可为空）
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, weekStart])
+  @@map("nutrition_reports")
 }
