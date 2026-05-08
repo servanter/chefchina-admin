@@ -17,11 +17,11 @@ async function fullVerify() {
 
   const total = recipes.length
   const complete = recipes.filter(r => 
-    r.calories > 0 && r.protein > 0 && r.fat > 0 && r.carbs > 0
+    (r.calories ?? 0) > 0 && (r.protein ?? 0) > 0 && (r.fat ?? 0) > 0 && (r.carbs ?? 0) > 0
   )
   const incomplete = recipes.filter(r => 
     !r.calories || !r.protein || !r.fat || !r.carbs ||
-    r.calories <= 0 || r.protein <= 0 || r.fat <= 0 || r.carbs <= 0
+    (r.calories ?? 0) <= 0 || (r.protein ?? 0) <= 0 || (r.fat ?? 0) <= 0 || (r.carbs ?? 0) <= 0
   )
 
   console.log(`\n📊 营养数据完整性统计:`)
