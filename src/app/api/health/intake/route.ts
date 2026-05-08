@@ -48,12 +48,13 @@ export async function POST(req: NextRequest) {
       return errorResponse('Recipe not found', 404)
     }
 
-    // 检查营养数据是否完整
-    if (!recipe.calories || !recipe.protein || !recipe.fat || !recipe.carbs) {
-      return errorResponse('Recipe nutrition data is incomplete', 400)
-    }
+    // 使用默认营养数据(如果为空)
+    const calories = recipe.calories ?? 0
+    const protein = recipe.protein ?? 0
+    const fat = recipe.fat ?? 0
+    const carbs = recipe.carbs ?? 0
 
-    // 计算营养值（考虑份数）
+    // 计算营养值(考虑份数)
     const intake = await prisma.dailyIntake.create({
       data: {
         userId,
@@ -61,10 +62,10 @@ export async function POST(req: NextRequest) {
         recipeId,
         mealType,
         servings,
-        calories: recipe.calories * servings,
-        protein: recipe.protein * servings,
-        fat: recipe.fat * servings,
-        carbs: recipe.carbs * servings,
+        calories: calories * servings,
+        protein: protein * servings,
+        fat: fat * servings,
+        carbs: carbs * servings,
         fiber: recipe.fiber ? recipe.fiber * servings : null,
         sodium: recipe.sodium ? recipe.sodium * servings : null,
         sugar: recipe.sugar ? recipe.sugar * servings : null,
