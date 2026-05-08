@@ -26,7 +26,7 @@ export interface WeeklyData {
 
 // DeepSeek 配置
 const client = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY || 'sk-your-deepseek-api-key',
+  apiKey: process.env.DEEPSEEK_API_KEY || '', // 空字符串会导致 API 调用失败,自动降级到规则生成
   baseURL: 'https://api.deepseek.com/v1',
 })
 
