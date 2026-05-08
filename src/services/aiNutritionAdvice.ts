@@ -35,7 +35,7 @@ const MODEL = 'qwen-max'
 /**
  * 调用通义千问生成建议
  */
-async function callAI(prompt: string): Promise<string> {
+async function callAI(prompt: string): Promise<{ content: string; source: 'ai' | 'rule' }> {
   try {
     const response = await client.chat.completions.create({
       model: MODEL,
@@ -53,11 +53,17 @@ async function callAI(prompt: string): Promise<string> {
       max_tokens: 200,
     })
 
-    return response.choices[0]?.message?.content?.trim() || '暂无建议'
+    return {
+      content: response.choices[0]?.message?.content?.trim() || '暂无建议',
+      source: 'ai'
+    }
   } catch (error) {
     console.error('AI 调用失败:', error)
     // 使用提示词中的数据生成规则建议
-    return generateRuleBasedAdvice(prompt)
+    return {
+      content: generateRuleBasedAdvice(prompt),
+      source: 'rule'
+    }
   }
 }
 
@@ -119,13 +125,16 @@ function generateRuleBasedAdvice(prompt: string): string {
 export async function generateWeeklyAdvice(
   profile: NutritionProfile,
   weeklyData: WeeklyData
-): Promise<string> {
+): Promise<{ content: string; source: 'ai' | 'rule' }> {
   const { goal, dailyCalories, proteinPercent, fatPercent, carbsPercent } = profile
   const { weekTotal, daysOnTarget, daysRecorded } = weeklyData
 
   // 没有记录数据时的快速返回
   if (daysRecorded === 0) {
-    return '本周还没有记录数据，开始记录你的饮食吧！📝'
+    return {
+      content: '本周还没有记录数据，开始记录你的饮食吧！📝',
+      source: 'rule'
+    }
   }
 
   // 计算平均值

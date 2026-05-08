@@ -207,7 +207,12 @@ export async function GET(req: NextRequest) {
         worstDay,
       },
       dailyData,
-      aiSuggestions: aiAdvice ? [aiAdvice] : [],
+      aiSuggestions: aiAdvice ? [
+        {
+          content: typeof aiAdvice === 'string' ? aiAdvice : aiAdvice.content,
+          source: typeof aiAdvice === 'string' ? 'rule' : aiAdvice.source
+        }
+      ] : [],
     })
   } catch (error) {
     return handleError(error)
