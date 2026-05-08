@@ -88,7 +88,7 @@ export async function GET(req: NextRequest) {
     })
 
     // 生成 AI 建议
-    const aiAdvice = profile
+    const aiAdviceResult = profile
       ? await generateWeeklyAdvice(
           {
             goal: profile.goal,
@@ -103,7 +103,10 @@ export async function GET(req: NextRequest) {
             daysRecorded: Object.keys(dailyStats).length,
           }
         )
-      : '请先设置健康档案'
+      : { content: '请先设置健康档案', source: 'rule' as const }
+
+    // 数据库存储只保存内容文本
+    const aiAdvice = typeof aiAdviceResult === 'string' ? aiAdviceResult : aiAdviceResult.content
 
     // 生成报告数据
     const reportData = {
@@ -207,10 +210,10 @@ export async function GET(req: NextRequest) {
         worstDay,
       },
       dailyData,
-      aiSuggestions: aiAdvice ? [
+      aiSuggestions: aiAdviceResult ? [
         {
-          content: typeof aiAdvice === 'string' ? aiAdvice : aiAdvice.content,
-          source: typeof aiAdvice === 'string' ? 'rule' : aiAdvice.source
+          content: typeof aiAdviceResult === 'string' ? aiAdviceResult : aiAdviceResult.content,
+          source: typeof aiAdviceResult === 'string' ? 'rule' : aiAdviceResult.source
         }
       ] : [],
     })
