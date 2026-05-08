@@ -1,6 +1,6 @@
 /**
  * AI 营养建议服务
- * 使用 DeepSeek V4 Flash 大模型
+ * 使用阿里云 DeepSeek V4 Flash 大模型
  */
 
 import OpenAI from 'openai'
@@ -24,16 +24,16 @@ export interface WeeklyData {
   daysRecorded: number
 }
 
-// DeepSeek 配置
+// 阿里云 DeepSeek 配置
 const client = new OpenAI({
   apiKey: process.env.DEEPSEEK_API_KEY || 'sk-your-deepseek-api-key',
-  baseURL: 'https://api.deepseek.com/v1',
+  baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',  // 阿里云 URL
 })
 
-const MODEL = 'deepseek-v4-flash'
+const MODEL = 'deepseek-v4-flash'  // 阿里云支持的 DeepSeek 模型
 
 /**
- * 调用 DeepSeek 生成建议
+ * 调用阿里云 DeepSeek 生成建议
  */
 async function callAI(prompt: string): Promise<{ content: string; source: 'ai' | 'rule' }> {
   try {
