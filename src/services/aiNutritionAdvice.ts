@@ -181,7 +181,7 @@ export async function generateDailyAdvice(
     fat: number
     carbs: number
   }
-): Promise<string> {
+): Promise<{ content: string; source: 'ai' | 'rule' }> {
   const { goal, dailyCalories, proteinPercent } = profile
   const { calories, protein, fat, carbs } = currentIntake
 
