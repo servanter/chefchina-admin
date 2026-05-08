@@ -131,7 +131,14 @@ export async function GET(req: NextRequest) {
 
     let report
     if (existingReport) {
-      report = existingReport
+      // ✅ 更新旧报告的 AI 建议
+      report = await prisma.nutritionReport.update({
+        where: { id: existingReport.id },
+        data: {
+          reportData,
+          aiAdvice, // 使用最新生成的 AI 建议
+        },
+      })
     } else {
       // 创建新报告（仅当有数据时）
       if (weekIntakes.length > 0) {
