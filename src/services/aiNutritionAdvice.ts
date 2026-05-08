@@ -224,7 +224,7 @@ export async function generateRecipeRecommendation(
     fat: number
     carbs: number
   }
-): Promise<string> {
+): Promise<{ content: string; source: 'ai' | 'rule' }> {
   const { goal, dailyCalories } = profile
 
   const goalMap: Record<string, string> = {
@@ -261,7 +261,7 @@ export async function analyzeRecipeNutrition(recipe: {
   carbs: number
   fiber?: number
   sodium?: number
-}): Promise<string> {
+}): Promise<{ content: string; source: 'ai' | 'rule' }> {
   const prompt = `
 菜谱名称：${recipe.name}
 营养成分（每份）：
