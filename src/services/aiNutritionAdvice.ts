@@ -1,9 +1,9 @@
 /**
  * AI 营养建议服务
- * 
- * 注意：当前返回 Mock 数据
- * 等用户提供 GPT API Token 后，再接入真实 AI
+ * 使用阿里云通义千问大模型
  */
+
+import OpenAI from 'openai'
 
 export interface NutritionProfile {
   goal: string
@@ -24,45 +24,93 @@ export interface WeeklyData {
   daysRecorded: number
 }
 
+// 阿里云通义千问配置
+const client = new OpenAI({
+  apiKey: 'sk-5c764e2fece140d8aeb0fccaaa59ca73',
+  baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+})
+
+const MODEL = 'qwen-max'
+
 /**
- * 生成周营养建议（Mock 版本）
+ * 调用通义千问生成建议
+ */
+async function callAI(prompt: string): Promise<string> {
+  try {
+    const response = await client.chat.completions.create({
+      model: MODEL,
+      messages: [
+        {
+          role: 'system',
+          content: '你是一位专业的营养师，擅长根据用户的饮食数据提供个性化的营养建议。请用简洁、友好的语气回答，不超过3句话。',
+        },
+        {
+          role: 'user',
+          content: prompt,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 200,
+    })
+
+    return response.choices[0]?.message?.content?.trim() || '暂无建议'
+  } catch (error) {
+    console.error('AI 调用失败:', error)
+    // 降级到简单规则
+    return '建议保持均衡饮食，适量运动，规律作息。'
+  }
+}
+
+/**
+ * 生成周营养建议
  */
 export async function generateWeeklyAdvice(
   profile: NutritionProfile,
   weeklyData: WeeklyData
 ): Promise<string> {
-  // TODO: 接入 GPT API
-  // const prompt = `基于用户目标（${profile.goal}）和本周数据，生成营养建议...`
-  // const response = await openai.chat.completions.create({ ... })
-  
-  // Mock 建议
-  const { goal } = profile
-  const { daysOnTarget, daysRecorded } = weeklyData
+  const { goal, dailyCalories, proteinPercent, fatPercent, carbsPercent } = profile
+  const { weekTotal, daysOnTarget, daysRecorded } = weeklyData
 
+  // 没有记录数据时的快速返回
   if (daysRecorded === 0) {
-    return '本周还没有记录数据，开始记录你的饮食吧！'
+    return '本周还没有记录数据，开始记录你的饮食吧！📝'
   }
 
-  if (daysOnTarget >= 5) {
-    return `太棒了！本周你有 ${daysOnTarget} 天达到了目标，保持这个节奏！💪`
-  }
+  // 计算平均值
+  const avgCalories = Math.round(weekTotal.calories / daysRecorded)
+  const avgProtein = Math.round(weekTotal.protein / daysRecorded)
+  const avgFat = Math.round(weekTotal.fat / daysRecorded)
+  const avgCarbs = Math.round(weekTotal.carbs / daysRecorded)
 
-  if (daysOnTarget >= 3) {
-    return `不错的进步！本周有 ${daysOnTarget} 天达标，继续努力！`
+  // 目标翻译
+  const goalMap: Record<string, string> = {
+    weight_loss: '减脂',
+    muscle_gain: '增肌',
+    maintain: '保持体重',
   }
+  const goalText = goalMap[goal] || '健康饮食'
 
-  // 根据目标给出建议
-  const tips: Record<string, string> = {
-    weight_loss: '建议：尝试增加高蛋白低热量食物，如鸡胸肉、鱼类和豆腐。多喝水，控制碳水摄入。',
-    muscle_gain: '建议：增加蛋白质摄入，推荐多吃瘦肉、鸡蛋和乳制品。运动后补充能量。',
-    maintain: '建议：保持均衡饮食，多样化食材选择。适量运动保持健康。',
-  }
+  // 构建 AI prompt
+  const prompt = `
+用户健康目标：${goalText}
+每日目标热量：${dailyCalories} 千卡
+营养比例目标：蛋白质 ${proteinPercent}%、脂肪 ${fatPercent}%、碳水 ${carbsPercent}%
 
-  return `本周记录了 ${daysRecorded} 天，${daysOnTarget} 天达标。${tips[goal] || tips.maintain}`
+本周实际表现（共记录 ${daysRecorded} 天）：
+- 平均每日热量：${avgCalories} 千卡
+- 平均蛋白质：${avgProtein}g
+- 平均脂肪：${avgFat}g
+- 平均碳水：${avgCarbs}g
+- 达标天数：${daysOnTarget} / ${daysRecorded}
+
+请根据以上数据，给出简洁的营养建议（2-3句话），帮助用户改进饮食。
+`
+
+  return await callAI(prompt)
 }
 
 /**
- * 生成每日饮食建议（Mock 版本）
+ * 生成每日饮食建议
  */
 export async function generateDailyAdvice(
   profile: NutritionProfile,
@@ -73,53 +121,98 @@ export async function generateDailyAdvice(
     carbs: number
   }
 ): Promise<string> {
-  // TODO: 接入 GPT API
-  
-  // Mock 建议
-  const { dailyCalories } = profile
-  const { calories } = currentIntake
+  const { goal, dailyCalories, proteinPercent } = profile
+  const { calories, protein, fat, carbs } = currentIntake
 
   const remaining = dailyCalories - calories
+  const targetProtein = Math.round((dailyCalories * proteinPercent / 100) / 4) // 1g 蛋白质 = 4 kcal
+  const proteinRemaining = targetProtein - protein
 
-  if (remaining > 500) {
-    return `今天还有 ${Math.round(remaining)} 卡路里额度，可以再吃点蔬菜和优质蛋白！`
+  const goalMap: Record<string, string> = {
+    weight_loss: '减脂',
+    muscle_gain: '增肌',
+    maintain: '保持体重',
   }
+  const goalText = goalMap[goal] || '健康饮食'
 
-  if (remaining > 0 && remaining <= 500) {
-    return `今天已经吃了大部分热量，建议清淡饮食或者适量加餐。`
-  }
+  const prompt = `
+用户健康目标：${goalText}
+每日目标热量：${dailyCalories} 千卡
 
-  return `今天的热量已经达标，如果还饿可以吃些低热量食物如蔬菜沙拉。`
+今日已摄入：
+- 热量：${calories} 千卡（剩余 ${remaining} 千卡）
+- 蛋白质：${protein}g（目标 ${targetProtein}g，剩余 ${proteinRemaining}g）
+- 脂肪：${fat}g
+- 碳水：${carbs}g
+
+请简短建议用户接下来的饮食安排（1-2句话）。
+`
+
+  return await callAI(prompt)
 }
 
 /**
- * 菜谱推荐理由（Mock 版本）
+ * 菜谱推荐理由
  */
 export async function generateRecipeRecommendation(
   profile: NutritionProfile,
   recipe: {
+    name?: string
     calories: number
     protein: number
     fat: number
     carbs: number
   }
 ): Promise<string> {
-  // TODO: 接入 GPT API
-  
-  // Mock 推荐理由
-  const { goal } = profile
+  const { goal, dailyCalories } = profile
 
-  if (goal === 'weight_loss' && recipe.calories < 400 && recipe.protein > 20) {
-    return '✅ 低热量高蛋白，适合减脂'
+  const goalMap: Record<string, string> = {
+    weight_loss: '减脂',
+    muscle_gain: '增肌',
+    maintain: '保持体重',
   }
+  const goalText = goalMap[goal] || '健康饮食'
 
-  if (goal === 'muscle_gain' && recipe.protein > 30) {
-    return '💪 高蛋白含量，适合增肌'
-  }
+  const prompt = `
+用户健康目标：${goalText}
+每日目标热量：${dailyCalories} 千卡
 
-  if (goal === 'maintain') {
-    return '👍 营养均衡，适合日常'
-  }
+这道菜谱${recipe.name ? `"${recipe.name}"` : ''}的营养成分：
+- 热量：${recipe.calories} 千卡
+- 蛋白质：${recipe.protein}g
+- 脂肪：${recipe.fat}g
+- 碳水：${recipe.carbs}g
 
-  return ''
+请用一句话（15字以内）说明这道菜是否适合用户的健康目标。格式如："✅ 低热量高蛋白，适合减脂" 或 "⚠️ 热量较高，建议适量"
+`
+
+  return await callAI(prompt)
+}
+
+/**
+ * 生成营养分析（用于菜谱详情页）
+ */
+export async function analyzeRecipeNutrition(recipe: {
+  name: string
+  calories: number
+  protein: number
+  fat: number
+  carbs: number
+  fiber?: number
+  sodium?: number
+}): Promise<string> {
+  const prompt = `
+菜谱名称：${recipe.name}
+营养成分（每份）：
+- 热量：${recipe.calories} 千卡
+- 蛋白质：${recipe.protein}g
+- 脂肪：${recipe.fat}g
+- 碳水化合物：${recipe.carbs}g
+${recipe.fiber ? `- 膳食纤维：${recipe.fiber}g` : ''}
+${recipe.sodium ? `- 钠：${recipe.sodium}mg` : ''}
+
+请用2-3句话分析这道菜的营养特点，并说明适合什么人群。语气要友好专业。
+`
+
+  return await callAI(prompt)
 }

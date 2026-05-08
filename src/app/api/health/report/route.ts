@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, handleError } from '@/lib/api'
 import { requireAuth } from '@/lib/auth-guard'
+import { generateWeeklyAdvice } from '@/services/aiNutritionAdvice'
 
 // GET /api/health/report?weekStart=2026-05-05 — 获取周报告
 export async function GET(req: NextRequest) {
@@ -86,8 +87,23 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    // Mock AI 建议（暂不实现真实 AI）
-    const aiAdvice = generateMockAdvice(daysOnTarget, profile)
+    // 生成 AI 建议
+    const aiAdvice = profile
+      ? await generateWeeklyAdvice(
+          {
+            goal: profile.goal,
+            dailyCalories: profile.dailyCalories,
+            proteinPercent: profile.proteinPercent,
+            fatPercent: profile.fatPercent,
+            carbsPercent: profile.carbsPercent,
+          },
+          {
+            weekTotal,
+            daysOnTarget,
+            daysRecorded: Object.keys(dailyStats).length,
+          }
+        )
+      : '请先设置健康档案'
 
     // 生成报告数据
     const reportData = {
@@ -131,32 +147,62 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    // 转换为前端期望的格式
+    const dailyData: Array<{
+      date: string
+      calories: number
+      protein: number
+      onTrack: boolean
+    }> = []
+
+    // 生成迗七天的数据点
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(weekStart)
+      date.setDate(date.getDate() + i)
+      const dateKey = date.toISOString().split('T')[0]
+      const stats = dailyStats[dateKey] || { calories: 0, protein: 0 }
+      const diff = Math.abs(stats.calories - goalCalories)
+      const onTrack = stats.calories > 0 && diff < goalCalories * 0.1
+
+      dailyData.push({
+        date: dateKey,
+        calories: stats.calories,
+        protein: stats.protein,
+        onTrack,
+      })
+    }
+
+    // 找出最佳/最差天
+    const nonZeroDays = dailyData.filter((d) => d.calories > 0)
+    let bestDay = weekStart.toISOString().split('T')[0]
+    let worstDay = weekStart.toISOString().split('T')[0]
+
+    if (nonZeroDays.length > 0) {
+      // 最佳 = 最接近目标
+      bestDay = nonZeroDays.sort(
+        (a, b) =>
+          Math.abs(a.calories - goalCalories) - Math.abs(b.calories - goalCalories)
+      )[0].date
+
+      // 最差 = 离目标最远
+      worstDay = nonZeroDays.sort(
+        (a, b) =>
+          Math.abs(b.calories - goalCalories) - Math.abs(a.calories - goalCalories)
+      )[0].date
+    }
+
     return successResponse({
-      report: report || null,
-      reportData,
-      aiAdvice,
+      summary: {
+        daysOnTrack: daysOnTarget,
+        avgCalories: Math.round(weekTotal.calories / Math.max(Object.keys(dailyStats).length, 1)),
+        avgProtein: Math.round(weekTotal.protein / Math.max(Object.keys(dailyStats).length, 1)),
+        bestDay,
+        worstDay,
+      },
+      dailyData,
+      aiSuggestions: aiAdvice ? [aiAdvice] : [],
     })
   } catch (error) {
     return handleError(error)
-  }
-}
-
-// 生成 Mock AI 建议
-function generateMockAdvice(
-  daysOnTarget: number,
-  profile: { goal: string } | null
-): string {
-  if (daysOnTarget >= 5) {
-    return '太棒了！本周你有 ${daysOnTarget} 天达到了目标，保持这个节奏！💪'
-  } else if (daysOnTarget >= 3) {
-    return '不错的进步！本周有 ${daysOnTarget} 天达标，继续努力！'
-  } else {
-    const goal = profile?.goal || 'maintain'
-    const tips: Record<string, string> = {
-      weight_loss: '建议：尝试增加高蛋白低热量食物，如鸡胸肉、鱼类和豆腐。',
-      muscle_gain: '建议：增加蛋白质摄入，推荐多吃瘦肉、鸡蛋和乳制品。',
-      maintain: '建议：保持均衡饮食，多样化食材选择。',
-    }
-    return `本周记录了 ${daysOnTarget} 天。${tips[goal] || tips.maintain}`
   }
 }
