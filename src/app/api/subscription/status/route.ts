@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserSubscription } from '@/lib/subscription';
 import { prisma } from '@/lib/prisma';
+import { requireAuth } from '@/lib/auth-guard';
+import { successResponse, errorResponse } from '@/lib/api';
 
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
-    const userId = searchParams.get('userId');
-
-    if (!userId) {
-      return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
-    }
+    // 从 JWT token 获取 userId，移除 query 参数依赖
+    const auth = requireAuth(request);
+    if (auth instanceof Response) return auth;
+    const userId = auth.sub;
 
     // 检查用户是否存在
     const user = await prisma.user.findUnique({
@@ -17,21 +17,21 @@ export async function GET(request: NextRequest) {
     });
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+      return errorResponse('User not found', 404);
     }
 
     // 获取订阅信息
     const subscription = await getUserSubscription(userId);
 
     if (!subscription) {
-      return NextResponse.json({
+      return successResponse({
         planType: 'FREE',
         status: 'ACTIVE',
         isPremium: false,
       });
     }
 
-    return NextResponse.json({
+    return successResponse({
       planType: subscription.planType,
       status: subscription.status,
       isPremium: subscription.isPremium,
@@ -42,9 +42,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('Error getting subscription status:', error);
-    return NextResponse.json(
-      { error: 'Failed to get subscription status' },
-      { status: 500 }
-    );
+    return errorResponse('Failed to get subscription status', 500);
   }
 }
