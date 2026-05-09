@@ -1,8 +1,9 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { successResponse, handleError } from '@/lib/api'
+import { successResponse, handleError, errorResponse } from '@/lib/api'
 import { requireAuth } from '@/lib/auth-guard'
 import { generateWeeklyAdvice } from '@/services/aiNutritionAdvice'
+import { isPremiumUser } from '@/lib/subscription'
 
 // GET /api/health/report?weekStart=2026-05-05 — 获取周报告
 export async function GET(req: NextRequest) {
@@ -87,23 +88,36 @@ export async function GET(req: NextRequest) {
       }
     })
 
-    // 生成 AI 建议
-    const aiAdviceResult = profile
-      ? await generateWeeklyAdvice(
-          {
-            goal: profile.goal,
-            dailyCalories: profile.dailyCalories,
-            proteinPercent: profile.proteinPercent,
-            fatPercent: profile.fatPercent,
-            carbsPercent: profile.carbsPercent,
-          },
-          {
-            weekTotal,
-            daysOnTarget,
-            daysRecorded: Object.keys(dailyStats).length,
-          }
-        )
-      : { content: '请先设置健康档案', source: 'rule' as const }
+    // 检查 Premium 权限（AI 建议需要 Premium）
+    const isPremium = await isPremiumUser(userId)
+
+    // 生成 AI 建议（仅 Premium 用户）
+    let aiAdviceResult
+    if (isPremium && profile) {
+      aiAdviceResult = await generateWeeklyAdvice(
+        {
+          goal: profile.goal,
+          dailyCalories: profile.dailyCalories,
+          proteinPercent: profile.proteinPercent,
+          fatPercent: profile.fatPercent,
+          carbsPercent: profile.carbsPercent,
+        },
+        {
+          weekTotal,
+          daysOnTarget,
+          daysRecorded: Object.keys(dailyStats).length,
+        }
+      )
+    } else if (!profile) {
+      aiAdviceResult = { content: '请先设置健康档案', source: 'rule' as const }
+    } else {
+      // 免费用户给予升级提示
+      aiAdviceResult = {
+        content: '订阅 Premium 套餐即可获得 AI 营养师的个性化建议，帮助你更好地达成健康目标！',
+        source: 'rule' as const,
+        premiumRequired: true,
+      }
+    }
 
     // 数据库存储只保存内容文本
     const aiAdvice = typeof aiAdviceResult === 'string' ? aiAdviceResult : aiAdviceResult.content
@@ -213,9 +227,11 @@ export async function GET(req: NextRequest) {
       aiSuggestions: aiAdviceResult ? [
         {
           content: typeof aiAdviceResult === 'string' ? aiAdviceResult : aiAdviceResult.content,
-          source: typeof aiAdviceResult === 'string' ? 'rule' : aiAdviceResult.source
+          source: typeof aiAdviceResult === 'string' ? 'rule' : aiAdviceResult.source,
+          premiumRequired: (aiAdviceResult as any).premiumRequired || false,
         }
       ] : [],
+      isPremium,
     })
   } catch (error) {
     return handleError(error)
