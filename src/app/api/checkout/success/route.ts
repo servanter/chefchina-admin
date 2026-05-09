@@ -3,6 +3,10 @@ import { stripe } from '@/lib/stripe';
 
 export async function GET(request: NextRequest) {
   try {
+    if (!stripe) {
+      return NextResponse.json({ error: 'Stripe not configured' }, { status: 500 });
+    }
+    
     const searchParams = request.nextUrl.searchParams;
     const sessionId = searchParams.get('session_id');
 
@@ -11,7 +15,7 @@ export async function GET(request: NextRequest) {
     }
 
     // 获取 Checkout Session
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const session = await stripe!.checkout.sessions.retrieve(sessionId);
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });

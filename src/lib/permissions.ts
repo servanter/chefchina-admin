@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isPremiumUser } from './subscription';
-import prisma from './db';
+import { prisma } from './prisma';
 
 export interface AuthenticatedRequest extends NextRequest {
   userId?: string;

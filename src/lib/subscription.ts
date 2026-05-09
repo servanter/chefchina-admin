@@ -1,4 +1,4 @@
-import prisma from '@/lib/db';
+import { prisma } from '@/lib/prisma';
 import { stripe, STRIPE_PRICES } from '@/lib/stripe';
 import Stripe from 'stripe';
 
@@ -13,6 +13,10 @@ export async function createCheckoutSession(
   successUrl: string,
   cancelUrl: string
 ) {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
+  
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { subscription: true },
@@ -45,7 +49,7 @@ export async function createCheckoutSession(
   let customerId = user.subscription?.stripeCustomerId;
 
   if (!customerId) {
-    const customer = await stripe.customers.create({
+    const customer = await stripe!.customers.create({
       email: user.email,
       name: user.name || undefined,
       metadata: {
@@ -70,7 +74,7 @@ export async function createCheckoutSession(
   }
 
   // 创建 Checkout Session
-  const session = await stripe.checkout.sessions.create({
+  const session = await stripe!.checkout.sessions.create({
     customer: customerId,
     line_items: [
       {
@@ -103,6 +107,10 @@ export async function createCheckoutSession(
  * 处理 Stripe Webhook 事件
  */
 export async function handleStripeWebhook(event: Stripe.Event) {
+  if (!stripe) {
+    throw new Error('Stripe is not configured');
+  }
+  
   switch (event.type) {
     case 'checkout.session.completed':
       await handleCheckoutComplete(event.data.object as Stripe.Checkout.Session);
@@ -130,7 +138,7 @@ export async function handleStripeWebhook(event: Stripe.Event) {
   }
 }
 
-async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
+async function handleCheckoutComplete(session: any) {
   const userId = session.metadata?.userId;
   if (!userId) {
     console.error('No userId in session metadata');
@@ -144,7 +152,7 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   }
 
   // 获取订阅详情
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const subscription = await stripe!.subscriptions.retrieve(subscriptionId) as any;
 
   await prisma.subscription.update({
     where: { userId },
@@ -179,9 +187,9 @@ async function handleCheckoutComplete(session: Stripe.Checkout.Session) {
   });
 }
 
-async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
+async function handleSubscriptionUpdate(subscription: any) {
   const customerId = subscription.customer as string;
-  const customer = await stripe.customers.retrieve(customerId);
+  const customer = await stripe!.customers.retrieve(customerId);
 
   if (customer.deleted) {
     console.error('Customer was deleted');
@@ -210,9 +218,9 @@ async function handleSubscriptionUpdate(subscription: Stripe.Subscription) {
   });
 }
 
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+async function handleSubscriptionDeleted(subscription: any) {
   const customerId = subscription.customer as string;
-  const customer = await stripe.customers.retrieve(customerId);
+  const customer = await stripe!.customers.retrieve(customerId);
 
   if (customer.deleted) {
     console.error('Customer was deleted');
@@ -234,9 +242,9 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   });
 }
 
-async function handlePaymentSuccess(invoice: Stripe.Invoice) {
+async function handlePaymentSuccess(invoice: any) {
   const customerId = invoice.customer as string;
-  const customer = await stripe.customers.retrieve(customerId);
+  const customer = await stripe!.customers.retrieve(customerId);
 
   if (customer.deleted) {
     console.error('Customer was deleted');
@@ -265,9 +273,9 @@ async function handlePaymentSuccess(invoice: Stripe.Invoice) {
   });
 }
 
-async function handlePaymentFailed(invoice: Stripe.Invoice) {
+async function handlePaymentFailed(invoice: any) {
   const customerId = invoice.customer as string;
-  const customer = await stripe.customers.retrieve(customerId);
+  const customer = await stripe!.customers.retrieve(customerId);
 
   if (customer.deleted) {
     console.error('Customer was deleted');
