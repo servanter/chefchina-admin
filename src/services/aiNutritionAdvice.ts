@@ -48,19 +48,17 @@ async function callAI(prompt: string): Promise<{ content: string; source: 'ai' |
       },
     ]
 
-    // 开发环境下打印完整的 prompt
-    if (process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV === 'development') {
-      console.log('\n========== AI Prompt ==========\n')
-      console.log('Model:', MODEL)
-      console.log('\nMessages:')
-      messages.forEach((msg, idx) => {
-        console.log(`\n[${idx + 1}] Role: ${msg.role}`)
-        console.log('Content:')
-        console.log(msg.content)
-        console.log('---')
-      })
-      console.log('\n==============================\n')
-    }
+    // 打印完整的 prompt（所有环境）
+    console.log('\n========== AI Prompt ==========\n')
+    console.log('Model:', MODEL)
+    console.log('\nMessages:')
+    messages.forEach((msg, idx) => {
+      console.log(`\n[${idx + 1}] Role: ${msg.role}`)
+      console.log('Content:')
+      console.log(msg.content)
+      console.log('---')
+    })
+    console.log('\n==============================\n')
 
     const response = await client.chat.completions.create({
       model: MODEL,
