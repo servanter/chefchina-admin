@@ -5,6 +5,7 @@ import { createNotification, hasRecentNotification, DAY_MS } from '@/lib/notific
 import { addUserExp } from '@/lib/exp'  // REQ-12.9
 import { requireAuth } from '@/lib/auth-guard'
 import { invalidateCache } from '@/lib/redis'
+import { checkFavoritesLimit } from '@/lib/permissions'
 
 // POST /api/favorites/[recipeId] — toggle favorite
 export async function POST(
@@ -28,6 +29,15 @@ export async function POST(
       await invalidateCache([`recipe:detail-full:${recipeId}:${userId}`])
       return successResponse({ favorited: false })
     } else {
+      // 检查收藏上限（免费用户 20 条）
+      const canFavorite = await checkFavoritesLimit(userId)
+      if (!canFavorite) {
+        return errorResponse(
+          'You have reached the favorites limit (20) for free users. Upgrade to Premium for unlimited favorites.',
+          403,
+          'FAVORITES_LIMIT_REACHED'
+        )
+      }
       await prisma.favorite.create({ data: { userId, recipeId } })
       // 清除该用户的详情页缓存
       await invalidateCache([`recipe:detail-full:${recipeId}:${userId}`])

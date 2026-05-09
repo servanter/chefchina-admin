@@ -71,6 +71,7 @@ model User {
   healthProfile UserHealthProfile? // SPRINT-004: 健康档案
   dailyIntakes  DailyIntake[]      // SPRINT-004: 每日摄入
   nutritionReports NutritionReport[] // SPRINT-004: 周报告
+  subscription  Subscription?       // Premium 订阅
 
   // REQ-18.5: 性能索引
   @@index([email])     // 邮箱查询（登录）
@@ -658,4 +659,75 @@ model NutritionReport {
 
   @@index([userId, weekStart])
   @@map("nutrition_reports")
+}
+
+// ─────────────────────────────────────────
+// Premium 订阅系统
+// ─────────────────────────────────────────
+
+// 订阅表
+model Subscription {
+  id                   String           @id @default(cuid())
+  userId               String           @unique
+  planType             SubscriptionPlan @default(FREE)
+  status               SubscriptionStatus @default(ACTIVE)
+  trialStart           DateTime?
+  trialEnd             DateTime?
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  stripeCustomerId     String?
+  stripeSubscriptionId String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+  @@map("subscriptions")
+}
+
+enum SubscriptionPlan {
+  FREE
+  PREMIUM
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  TRIAL
+  CANCELLED
+  EXPIRED
+}
+
+// 支付交易记录
+model PaymentTransaction {
+  id                String   @id @default(cuid())
+  userId            String
+  subscriptionId    String?
+  stripePaymentId   String?  @unique
+  amount            Int      // 金额（美分）
+  currency          String   @default("usd")
+  status            PaymentStatus @default(PENDING)
+  paymentMethod     String?  // card, apple_pay, etc.
+  receiptUrl        String?
+  errorMessage      String?
+  metadata          Json?    // 额外信息
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([userId])
+  @@index([subscriptionId])
+  @@index([stripePaymentId])
+  @@index([createdAt])
+  @@map("payment_transactions")
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+  CANCELLED
 }
