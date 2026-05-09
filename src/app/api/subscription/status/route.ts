@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { getUserSubscription } from '@/lib/subscription';
 import { prisma } from '@/lib/prisma';
 import { requireAuth } from '@/lib/auth-guard';
