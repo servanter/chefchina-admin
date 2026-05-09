@@ -13,18 +13,36 @@ export async function createCheckoutSession(
   successUrl: string,
   cancelUrl: string
 ) {
+  console.log('[Subscription] Creating checkout session:', { userId, planType });
+
   if (!stripe) {
+    console.error('[Subscription] Stripe is not configured');
     throw new Error('Stripe is not configured');
   }
   
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { subscription: true },
-  });
+  // 获取用户信息
+  let user;
+  try {
+    user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { subscription: true },
+    });
+  } catch (dbError) {
+    console.error('[Subscription] Database error fetching user:', dbError);
+    throw new Error('Database error: Failed to fetch user');
+  }
 
   if (!user) {
+    console.error('[Subscription] User not found:', userId);
     throw new Error('User not found');
   }
+
+  console.log('[Subscription] User found:', { 
+    id: user.id, 
+    email: user.email,
+    hasSubscription: !!user.subscription,
+    customerId: user.subscription?.stripeCustomerId 
+  });
 
   // 获取 Price ID
   let priceId: string;
@@ -42,59 +60,94 @@ export async function createCheckoutSession(
       trialDays = 0;
       break;
     default:
+      console.error('[Subscription] Invalid plan type:', planType);
       throw new Error('Invalid plan type');
   }
+
+  console.log('[Subscription] Price configuration:', { priceId, trialDays });
 
   // 创建或获取 Stripe Customer
   let customerId = user.subscription?.stripeCustomerId;
 
   if (!customerId) {
-    const customer = await stripe!.customers.create({
-      email: user.email,
-      name: user.name || undefined,
-      metadata: {
-        userId: user.id,
-      },
-    });
-    customerId = customer.id;
+    console.log('[Subscription] Creating new Stripe customer');
+    try {
+      const customer = await stripe!.customers.create({
+        email: user.email,
+        name: user.name || undefined,
+        metadata: {
+          userId: user.id,
+        },
+      });
+      customerId = customer.id;
+      console.log('[Subscription] Stripe customer created:', customerId);
+    } catch (stripeError) {
+      console.error('[Subscription] Error creating Stripe customer:', stripeError);
+      throw new Error(
+        `Failed to create Stripe customer: ${stripeError instanceof Error ? stripeError.message : 'Unknown error'}`
+      );
+    }
 
     // 更新用户订阅记录
-    await prisma.subscription.upsert({
-      where: { userId: user.id },
-      create: {
-        userId: user.id,
-        planType: 'FREE',
-        status: 'ACTIVE',
-        stripeCustomerId: customerId,
-      },
-      update: {
-        stripeCustomerId: customerId,
-      },
-    });
+    try {
+      await prisma.subscription.upsert({
+        where: { userId: user.id },
+        create: {
+          userId: user.id,
+          planType: 'FREE',
+          status: 'ACTIVE',
+          stripeCustomerId: customerId,
+        },
+        update: {
+          stripeCustomerId: customerId,
+        },
+      });
+      console.log('[Subscription] Subscription record updated with customer ID');
+    } catch (dbError) {
+      console.error('[Subscription] Error updating subscription record:', dbError);
+      // 不抛出错误，因为客户已经创建了，我们仍然可以继续
+      console.warn('[Subscription] Continuing despite database update error');
+    }
+  } else {
+    console.log('[Subscription] Using existing Stripe customer:', customerId);
   }
 
   // 创建 Checkout Session
-  const session = await stripe!.checkout.sessions.create({
-    customer: customerId,
-    line_items: [
-      {
-        price: priceId,
-        quantity: 1,
+  console.log('[Subscription] Creating Stripe checkout session');
+  let session;
+  try {
+    session = await stripe!.checkout.sessions.create({
+      customer: customerId,
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      subscription_data:
+        trialDays > 0
+          ? {
+              trial_period_days: trialDays,
+            }
+          : undefined,
+      metadata: {
+        userId: user.id,
+        planType,
       },
-    ],
-    mode: 'subscription',
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    subscription_data:
-      trialDays > 0
-        ? {
-            trial_period_days: trialDays,
-          }
-        : undefined,
-    metadata: {
-      userId: user.id,
-      planType,
-    },
+    });
+  } catch (stripeError) {
+    console.error('[Subscription] Error creating checkout session:', stripeError);
+    throw new Error(
+      `Failed to create Stripe checkout session: ${stripeError instanceof Error ? stripeError.message : 'Unknown error'}`
+    );
+  }
+
+  console.log('[Subscription] Checkout session created successfully:', {
+    sessionId: session.id,
+    url: session.url,
   });
 
   return {
