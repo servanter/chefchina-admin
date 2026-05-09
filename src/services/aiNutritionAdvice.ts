@@ -37,18 +37,34 @@ const MODEL = 'deepseek-v4-flash'  // 阿里云支持的 DeepSeek 模型
  */
 async function callAI(prompt: string): Promise<{ content: string; source: 'ai' | 'rule' }> {
   try {
+    const messages = [
+      {
+        role: 'system',
+        content: '你是一位专业的营养师，擅长根据用户的饮食数据提供个性化的营养建议。请用简洁、友好的语气回答，不超过3句话。',
+      },
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ]
+
+    // 开发环境下打印完整的 prompt
+    if (process.env.NODE_ENV === 'development' || process.env.VERCEL_ENV === 'development') {
+      console.log('\n========== AI Prompt ==========\n')
+      console.log('Model:', MODEL)
+      console.log('\nMessages:')
+      messages.forEach((msg, idx) => {
+        console.log(`\n[${idx + 1}] Role: ${msg.role}`)
+        console.log('Content:')
+        console.log(msg.content)
+        console.log('---')
+      })
+      console.log('\n==============================\n')
+    }
+
     const response = await client.chat.completions.create({
       model: MODEL,
-      messages: [
-        {
-          role: 'system',
-          content: '你是一位专业的营养师，擅长根据用户的饮食数据提供个性化的营养建议。请用简洁、友好的语气回答，不超过3句话。',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
+      messages,
       temperature: 0.7,
       max_tokens: 200,
     })
