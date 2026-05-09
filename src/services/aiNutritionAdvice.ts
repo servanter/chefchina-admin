@@ -37,7 +37,7 @@ const MODEL = 'deepseek-v4-flash'  // 阿里云支持的 DeepSeek 模型
  */
 async function callAI(prompt: string): Promise<{ content: string; source: 'ai' | 'rule' }> {
   try {
-    const messages = [
+    const messages: Array<{ role: 'system' | 'user'; content: string }> = [
       {
         role: 'system',
         content: '你是一位专业的营养师，擅长根据用户的饮食数据提供个性化的营养建议。请用简洁、友好的语气回答，不超过3句话。',
