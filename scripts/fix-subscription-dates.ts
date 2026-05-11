@@ -123,7 +123,7 @@ async function fixSubscription(sub: BrokenSubscription): Promise<FixResult> {
     // 从 Stripe 获取正确时间
     const stripeSubscription = await stripe.subscriptions.retrieve(
       sub.stripeSubscriptionId
-    );
+    ) as any; // TypeScript workaround for Response<Subscription>
 
     if (!stripeSubscription.current_period_start || !stripeSubscription.current_period_end) {
       throw new Error('Stripe 返回的订阅没有时间戳');
