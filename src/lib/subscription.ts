@@ -403,9 +403,14 @@ export async function getUserSubscription(userId: string) {
     isPremium = subscription.currentPeriodEnd > now;
   }
 
+  // 修复：强制序列化 Date 为 ISO 字符串，避免序列化时的时区问题
   return {
     ...subscription,
     isPremium,
+    currentPeriodStart: subscription.currentPeriodStart?.toISOString(),
+    currentPeriodEnd: subscription.currentPeriodEnd?.toISOString(),
+    trialStart: subscription.trialStart?.toISOString(),
+    trialEnd: subscription.trialEnd?.toISOString(),
   };
 }
 
