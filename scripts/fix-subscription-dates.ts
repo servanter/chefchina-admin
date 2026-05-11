@@ -9,7 +9,7 @@
  *   npx tsx scripts/fix-subscription-dates.ts [--dry-run] [--verbose]
  */
 
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient } from '../src/generated/prisma';
 import Stripe from 'stripe';
 
 const prisma = new PrismaClient();
