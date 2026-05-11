@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     // 4. 从数据库查询订阅详情
     let subscription;
     try {
-      subscription = await prisma.subscription.findUnique({
+      subscription = await prisma.subscription.findFirst({
         where: { stripeSubscriptionId: subscriptionId },
       });
     } catch (dbError) {
