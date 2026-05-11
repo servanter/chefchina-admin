@@ -207,18 +207,30 @@ async function handleCheckoutComplete(session: any) {
   // 获取订阅详情
   const subscription = await stripe!.subscriptions.retrieve(subscriptionId) as any;
 
+  // 将 Unix 时间戳（秒）转换为 Date 对象（毫秒）
+  const currentPeriodStart = subscription.current_period_start
+    ? new Date(subscription.current_period_start * 1000)
+    : new Date();
+  const currentPeriodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end * 1000)
+    : new Date();
+  const trialStart = subscription.trial_start
+    ? new Date(subscription.trial_start * 1000)
+    : null;
+  const trialEnd = subscription.trial_end
+    ? new Date(subscription.trial_end * 1000)
+    : null;
+
   await prisma.subscription.update({
     where: { userId },
     data: {
       stripeSubscriptionId: subscriptionId,
       planType: 'PREMIUM',
       status: subscription.status === 'trialing' ? 'TRIAL' : 'ACTIVE',
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-      trialStart: subscription.trial_start
-        ? new Date(subscription.trial_start * 1000)
-        : null,
-      trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+      currentPeriodStart,
+      currentPeriodEnd,
+      trialStart,
+      trialEnd,
     },
   });
 
@@ -255,18 +267,30 @@ async function handleSubscriptionUpdate(subscription: any) {
     return;
   }
 
+  // 将 Unix 时间戳（秒）转换为 Date 对象（毫秒）
+  const currentPeriodStart = subscription.current_period_start
+    ? new Date(subscription.current_period_start * 1000)
+    : new Date();
+  const currentPeriodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end * 1000)
+    : new Date();
+  const trialStart = subscription.trial_start
+    ? new Date(subscription.trial_start * 1000)
+    : null;
+  const trialEnd = subscription.trial_end
+    ? new Date(subscription.trial_end * 1000)
+    : null;
+
   await prisma.subscription.update({
     where: { userId },
     data: {
       stripeSubscriptionId: subscription.id,
       planType: 'PREMIUM',
       status: subscription.status === 'trialing' ? 'TRIAL' : 'ACTIVE',
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-      trialStart: subscription.trial_start
-        ? new Date(subscription.trial_start * 1000)
-        : null,
-      trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+      currentPeriodStart,
+      currentPeriodEnd,
+      trialStart,
+      trialEnd,
     },
   });
 }
