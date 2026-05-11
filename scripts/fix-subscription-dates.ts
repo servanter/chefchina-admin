@@ -22,7 +22,7 @@ if (!stripeSecretKey) {
 }
 
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: '2025-01-27.acacia',
+  apiVersion: '2026-04-22.dahlia',
 });
 
 // 命令行参数
