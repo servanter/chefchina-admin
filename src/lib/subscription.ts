@@ -392,9 +392,24 @@ export async function getUserSubscription(userId: string) {
     isPremium = subscription.currentPeriodEnd > now;
   }
 
+  // 调试日志：打印原始 Date 对象
+  console.log('[getUserSubscription] Raw Date objects from Prisma:', {
+    currentPeriodStart: subscription.currentPeriodStart,
+    currentPeriodEnd: subscription.currentPeriodEnd,
+    trialStart: subscription.trialStart,
+    trialEnd: subscription.trialEnd,
+    now,
+    isPremium,
+  });
+
+  // 修复：强制序列化 Date 为 ISO 字符串，避免序列化时时区问题
   return {
     ...subscription,
     isPremium,
+    currentPeriodStart: subscription.currentPeriodStart?.toISOString(),
+    currentPeriodEnd: subscription.currentPeriodEnd?.toISOString(),
+    trialStart: subscription.trialStart?.toISOString(),
+    trialEnd: subscription.trialEnd?.toISOString(),
   };
 }
 
