@@ -1,6 +1,6 @@
 /**
  * AI 营养建议服务
- * 使用 DeepSeek V4 Flash 大模型
+ * 使用阿里云 DeepSeek V4 Flash 大模型
  */
 
 import OpenAI from 'openai'
@@ -24,31 +24,45 @@ export interface WeeklyData {
   daysRecorded: number
 }
 
-// DeepSeek 配置
+// 阿里云 DeepSeek 配置
 const client = new OpenAI({
   apiKey: process.env.DEEPSEEK_API_KEY || 'sk-your-deepseek-api-key',
-  baseURL: 'https://api.deepseek.com/v1',
+  baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',  // 阿里云 URL
 })
 
-const MODEL = 'deepseek-v4-flash'
+const MODEL = 'deepseek-v4-flash'  // 阿里云支持的 DeepSeek 模型
 
 /**
- * 调用 DeepSeek 生成建议
+ * 调用阿里云 DeepSeek 生成建议
  */
 async function callAI(prompt: string): Promise<{ content: string; source: 'ai' | 'rule' }> {
   try {
+    const messages: Array<{ role: 'system' | 'user'; content: string }> = [
+      {
+        role: 'system',
+        content: '你是一位专业的营养师，擅长根据用户的饮食数据提供个性化的营养建议。请用简洁、友好的语气回答，不超过3句话。',
+      },
+      {
+        role: 'user',
+        content: prompt,
+      },
+    ]
+
+    // 打印完整的 prompt（所有环境）
+    console.log('\n========== AI Prompt ==========\n')
+    console.log('Model:', MODEL)
+    console.log('\nMessages:')
+    messages.forEach((msg, idx) => {
+      console.log(`\n[${idx + 1}] Role: ${msg.role}`)
+      console.log('Content:')
+      console.log(msg.content)
+      console.log('---')
+    })
+    console.log('\n==============================\n')
+
     const response = await client.chat.completions.create({
       model: MODEL,
-      messages: [
-        {
-          role: 'system',
-          content: '你是一位专业的营养师，擅长根据用户的饮食数据提供个性化的营养建议。请用简洁、友好的语气回答，不超过3句话。',
-        },
-        {
-          role: 'user',
-          content: prompt,
-        },
-      ],
+      messages,
       temperature: 0.7,
       max_tokens: 200,
     })

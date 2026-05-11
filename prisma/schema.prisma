@@ -5,8 +5,8 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  url       = env("POSTGRES_PRISMA_URL")  // ✅ 使用 Supabase PgBouncer 连接池（:6543）
+  directUrl = env("DIRECT_URL")           // ✅ migration 用直连 URL（:5432）
 }
 
 // ─────────────────────────────────────────

@@ -13,18 +13,36 @@ export async function createCheckoutSession(
   successUrl: string,
   cancelUrl: string
 ) {
+  console.log('[Subscription] Creating checkout session:', { userId, planType });
+
   if (!stripe) {
+    console.error('[Subscription] Stripe is not configured');
     throw new Error('Stripe is not configured');
   }
   
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    include: { subscription: true },
-  });
+  // 获取用户信息
+  let user;
+  try {
+    user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { subscription: true },
+    });
+  } catch (dbError) {
+    console.error('[Subscription] Database error fetching user:', dbError);
+    throw new Error('Database error: Failed to fetch user');
+  }
 
   if (!user) {
+    console.error('[Subscription] User not found:', userId);
     throw new Error('User not found');
   }
+
+  console.log('[Subscription] User found:', { 
+    id: user.id, 
+    email: user.email,
+    hasSubscription: !!user.subscription,
+    customerId: user.subscription?.stripeCustomerId 
+  });
 
   // 获取 Price ID
   let priceId: string;
@@ -42,59 +60,94 @@ export async function createCheckoutSession(
       trialDays = 0;
       break;
     default:
+      console.error('[Subscription] Invalid plan type:', planType);
       throw new Error('Invalid plan type');
   }
+
+  console.log('[Subscription] Price configuration:', { priceId, trialDays });
 
   // 创建或获取 Stripe Customer
   let customerId = user.subscription?.stripeCustomerId;
 
   if (!customerId) {
-    const customer = await stripe!.customers.create({
-      email: user.email,
-      name: user.name || undefined,
-      metadata: {
-        userId: user.id,
-      },
-    });
-    customerId = customer.id;
+    console.log('[Subscription] Creating new Stripe customer');
+    try {
+      const customer = await stripe!.customers.create({
+        email: user.email,
+        name: user.name || undefined,
+        metadata: {
+          userId: user.id,
+        },
+      });
+      customerId = customer.id;
+      console.log('[Subscription] Stripe customer created:', customerId);
+    } catch (stripeError) {
+      console.error('[Subscription] Error creating Stripe customer:', stripeError);
+      throw new Error(
+        `Failed to create Stripe customer: ${stripeError instanceof Error ? stripeError.message : 'Unknown error'}`
+      );
+    }
 
     // 更新用户订阅记录
-    await prisma.subscription.upsert({
-      where: { userId: user.id },
-      create: {
-        userId: user.id,
-        planType: 'FREE',
-        status: 'ACTIVE',
-        stripeCustomerId: customerId,
-      },
-      update: {
-        stripeCustomerId: customerId,
-      },
-    });
+    try {
+      await prisma.subscription.upsert({
+        where: { userId: user.id },
+        create: {
+          userId: user.id,
+          planType: 'FREE',
+          status: 'ACTIVE',
+          stripeCustomerId: customerId,
+        },
+        update: {
+          stripeCustomerId: customerId,
+        },
+      });
+      console.log('[Subscription] Subscription record updated with customer ID');
+    } catch (dbError) {
+      console.error('[Subscription] Error updating subscription record:', dbError);
+      // 不抛出错误，因为客户已经创建了，我们仍然可以继续
+      console.warn('[Subscription] Continuing despite database update error');
+    }
+  } else {
+    console.log('[Subscription] Using existing Stripe customer:', customerId);
   }
 
   // 创建 Checkout Session
-  const session = await stripe!.checkout.sessions.create({
-    customer: customerId,
-    line_items: [
-      {
-        price: priceId,
-        quantity: 1,
+  console.log('[Subscription] Creating Stripe checkout session');
+  let session;
+  try {
+    session = await stripe!.checkout.sessions.create({
+      customer: customerId,
+      line_items: [
+        {
+          price: priceId,
+          quantity: 1,
+        },
+      ],
+      mode: 'subscription',
+      success_url: successUrl,
+      cancel_url: cancelUrl,
+      subscription_data:
+        trialDays > 0
+          ? {
+              trial_period_days: trialDays,
+            }
+          : undefined,
+      metadata: {
+        userId: user.id,
+        planType,
       },
-    ],
-    mode: 'subscription',
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    subscription_data:
-      trialDays > 0
-        ? {
-            trial_period_days: trialDays,
-          }
-        : undefined,
-    metadata: {
-      userId: user.id,
-      planType,
-    },
+    });
+  } catch (stripeError) {
+    console.error('[Subscription] Error creating checkout session:', stripeError);
+    throw new Error(
+      `Failed to create Stripe checkout session: ${stripeError instanceof Error ? stripeError.message : 'Unknown error'}`
+    );
+  }
+
+  console.log('[Subscription] Checkout session created successfully:', {
+    sessionId: session.id,
+    url: session.url,
   });
 
   return {
@@ -154,40 +207,19 @@ async function handleCheckoutComplete(session: any) {
   // 获取订阅详情
   const subscription = await stripe!.subscriptions.retrieve(subscriptionId) as any;
 
-  // 🔍 日志：打印 Stripe 返回的原始时间戳
-  console.log('[Webhook] Stripe subscription timestamps:', {
-    subscriptionId,
-    current_period_start: subscription.current_period_start,
-    current_period_end: subscription.current_period_end,
-    trial_start: subscription.trial_start,
-    trial_end: subscription.trial_end,
-    status: subscription.status,
-  });
-
-  // ⚠️ 如果 Stripe 没有返回时间戳，使用合理的默认值（30天订阅周期）
-  const now = Date.now();
-  const defaultPeriodMs = 30 * 24 * 60 * 60 * 1000; // 30 天
-
+  // 将 Unix 时间戳（秒）转换为 Date 对象（毫秒）
   const currentPeriodStart = subscription.current_period_start
     ? new Date(subscription.current_period_start * 1000)
-    : new Date(now);
+    : new Date();
   const currentPeriodEnd = subscription.current_period_end
     ? new Date(subscription.current_period_end * 1000)
-    : new Date(now + defaultPeriodMs); // 默认 30 天后过期
+    : new Date();
   const trialStart = subscription.trial_start
     ? new Date(subscription.trial_start * 1000)
     : null;
   const trialEnd = subscription.trial_end
     ? new Date(subscription.trial_end * 1000)
     : null;
-
-  // 🔍 日志：打印转换后的日期
-  console.log('[Webhook] Converted dates:', {
-    currentPeriodStart: currentPeriodStart.toISOString(),
-    currentPeriodEnd: currentPeriodEnd.toISOString(),
-    trialStart: trialStart?.toISOString() || null,
-    trialEnd: trialEnd?.toISOString() || null,
-  });
 
   await prisma.subscription.update({
     where: { userId },
@@ -235,40 +267,19 @@ async function handleSubscriptionUpdate(subscription: any) {
     return;
   }
 
-  // 🔍 日志：打印 Stripe 返回的原始时间戳
-  console.log('[Webhook] Stripe subscription update timestamps:', {
-    subscriptionId: subscription.id,
-    current_period_start: subscription.current_period_start,
-    current_period_end: subscription.current_period_end,
-    trial_start: subscription.trial_start,
-    trial_end: subscription.trial_end,
-    status: subscription.status,
-  });
-
-  // ⚠️ 如果 Stripe 没有返回时间戳，使用合理的默认值（30天订阅周期）
-  const now = Date.now();
-  const defaultPeriodMs = 30 * 24 * 60 * 60 * 1000; // 30 天
-
+  // 将 Unix 时间戳（秒）转换为 Date 对象（毫秒）
   const currentPeriodStart = subscription.current_period_start
     ? new Date(subscription.current_period_start * 1000)
-    : new Date(now);
+    : new Date();
   const currentPeriodEnd = subscription.current_period_end
     ? new Date(subscription.current_period_end * 1000)
-    : new Date(now + defaultPeriodMs); // 默认 30 天后过期
+    : new Date();
   const trialStart = subscription.trial_start
     ? new Date(subscription.trial_start * 1000)
     : null;
   const trialEnd = subscription.trial_end
     ? new Date(subscription.trial_end * 1000)
     : null;
-
-  // 🔍 日志：打印转换后的日期
-  console.log('[Webhook] Converted dates:', {
-    currentPeriodStart: currentPeriodStart.toISOString(),
-    currentPeriodEnd: currentPeriodEnd.toISOString(),
-    trialStart: trialStart?.toISOString() || null,
-    trialEnd: trialEnd?.toISOString() || null,
-  });
 
   await prisma.subscription.update({
     where: { userId },
@@ -392,17 +403,7 @@ export async function getUserSubscription(userId: string) {
     isPremium = subscription.currentPeriodEnd > now;
   }
 
-  // 调试日志：打印原始 Date 对象
-  console.log('[getUserSubscription] Raw Date objects from Prisma:', {
-    currentPeriodStart: subscription.currentPeriodStart,
-    currentPeriodEnd: subscription.currentPeriodEnd,
-    trialStart: subscription.trialStart,
-    trialEnd: subscription.trialEnd,
-    now,
-    isPremium,
-  });
-
-  // 修复：强制序列化 Date 为 ISO 字符串，避免序列化时时区问题
+  // 修复：强制序列化 Date 为 ISO 字符串，避免序列化时的时区问题
   return {
     ...subscription,
     isPremium,
