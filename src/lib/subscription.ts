@@ -154,18 +154,51 @@ async function handleCheckoutComplete(session: any) {
   // 获取订阅详情
   const subscription = await stripe!.subscriptions.retrieve(subscriptionId) as any;
 
+  // 🔍 日志：打印 Stripe 返回的原始时间戳
+  console.log('[Webhook] Stripe subscription timestamps:', {
+    subscriptionId,
+    current_period_start: subscription.current_period_start,
+    current_period_end: subscription.current_period_end,
+    trial_start: subscription.trial_start,
+    trial_end: subscription.trial_end,
+    status: subscription.status,
+  });
+
+  // ⚠️ 如果 Stripe 没有返回时间戳，使用合理的默认值（30天订阅周期）
+  const now = Date.now();
+  const defaultPeriodMs = 30 * 24 * 60 * 60 * 1000; // 30 天
+
+  const currentPeriodStart = subscription.current_period_start
+    ? new Date(subscription.current_period_start * 1000)
+    : new Date(now);
+  const currentPeriodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end * 1000)
+    : new Date(now + defaultPeriodMs); // 默认 30 天后过期
+  const trialStart = subscription.trial_start
+    ? new Date(subscription.trial_start * 1000)
+    : null;
+  const trialEnd = subscription.trial_end
+    ? new Date(subscription.trial_end * 1000)
+    : null;
+
+  // 🔍 日志：打印转换后的日期
+  console.log('[Webhook] Converted dates:', {
+    currentPeriodStart: currentPeriodStart.toISOString(),
+    currentPeriodEnd: currentPeriodEnd.toISOString(),
+    trialStart: trialStart?.toISOString() || null,
+    trialEnd: trialEnd?.toISOString() || null,
+  });
+
   await prisma.subscription.update({
     where: { userId },
     data: {
       stripeSubscriptionId: subscriptionId,
       planType: 'PREMIUM',
       status: subscription.status === 'trialing' ? 'TRIAL' : 'ACTIVE',
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-      trialStart: subscription.trial_start
-        ? new Date(subscription.trial_start * 1000)
-        : null,
-      trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+      currentPeriodStart,
+      currentPeriodEnd,
+      trialStart,
+      trialEnd,
     },
   });
 
@@ -202,18 +235,51 @@ async function handleSubscriptionUpdate(subscription: any) {
     return;
   }
 
+  // 🔍 日志：打印 Stripe 返回的原始时间戳
+  console.log('[Webhook] Stripe subscription update timestamps:', {
+    subscriptionId: subscription.id,
+    current_period_start: subscription.current_period_start,
+    current_period_end: subscription.current_period_end,
+    trial_start: subscription.trial_start,
+    trial_end: subscription.trial_end,
+    status: subscription.status,
+  });
+
+  // ⚠️ 如果 Stripe 没有返回时间戳，使用合理的默认值（30天订阅周期）
+  const now = Date.now();
+  const defaultPeriodMs = 30 * 24 * 60 * 60 * 1000; // 30 天
+
+  const currentPeriodStart = subscription.current_period_start
+    ? new Date(subscription.current_period_start * 1000)
+    : new Date(now);
+  const currentPeriodEnd = subscription.current_period_end
+    ? new Date(subscription.current_period_end * 1000)
+    : new Date(now + defaultPeriodMs); // 默认 30 天后过期
+  const trialStart = subscription.trial_start
+    ? new Date(subscription.trial_start * 1000)
+    : null;
+  const trialEnd = subscription.trial_end
+    ? new Date(subscription.trial_end * 1000)
+    : null;
+
+  // 🔍 日志：打印转换后的日期
+  console.log('[Webhook] Converted dates:', {
+    currentPeriodStart: currentPeriodStart.toISOString(),
+    currentPeriodEnd: currentPeriodEnd.toISOString(),
+    trialStart: trialStart?.toISOString() || null,
+    trialEnd: trialEnd?.toISOString() || null,
+  });
+
   await prisma.subscription.update({
     where: { userId },
     data: {
       stripeSubscriptionId: subscription.id,
       planType: 'PREMIUM',
       status: subscription.status === 'trialing' ? 'TRIAL' : 'ACTIVE',
-      currentPeriodStart: new Date(subscription.current_period_start * 1000),
-      currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-      trialStart: subscription.trial_start
-        ? new Date(subscription.trial_start * 1000)
-        : null,
-      trialEnd: subscription.trial_end ? new Date(subscription.trial_end * 1000) : null,
+      currentPeriodStart,
+      currentPeriodEnd,
+      trialStart,
+      trialEnd,
     },
   });
 }
