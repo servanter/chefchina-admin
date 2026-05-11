@@ -27,8 +27,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // 创建成功和取消 URL
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+    // 创建成功和取消 URL（使用环境变量 PUBLIC_URL 或 NEXTAUTH_URL）
+    const baseUrl = process.env.PUBLIC_URL || process.env.NEXTAUTH_URL || 'http://localhost:3000';
     const successUrl = `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${baseUrl}/pricing`;
 
