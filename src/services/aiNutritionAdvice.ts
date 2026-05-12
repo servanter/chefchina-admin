@@ -27,10 +27,29 @@ export interface WeeklyData {
 // 阿里云 DeepSeek 配置
 const client = new OpenAI({
   apiKey: process.env.DEEPSEEK_API_KEY || 'sk-your-deepseek-api-key',
-  baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',  // 阿里云 URL
+  baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
 })
 
-const MODEL = 'deepseek-v4-flash'  // 阿里云支持的 DeepSeek 模型
+const MODEL = 'deepseek-v4-flash'
+
+export interface NutritionProfile {
+  goal: string
+  dailyCalories: number
+  proteinPercent: number
+  fatPercent: number
+  carbsPercent: number
+}
+
+export interface WeeklyData {
+  weekTotal: {
+    calories: number
+    protein: number
+    fat: number
+    carbs: number
+  }
+  daysOnTarget: number
+  daysRecorded: number
+}
 
 /**
  * 调用阿里云 DeepSeek 生成建议
