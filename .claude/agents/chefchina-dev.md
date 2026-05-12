@@ -33,13 +33,19 @@ model: gongfeng/claude-sonnet-4-5
    - 双语字段 `xxxEn` / `xxxZh`，i18n 文案同步中英
    - 新增 API 必须走 `requireAuth` / `requireSelfOrAdmin` 鉴权
    - 列表 API 走 cursor 分页契约 `{ cursor, limit } → { items, nextCursor }`（配合 `useInfiniteList`）
-4. **交付报告**（不超过 800 字）：
+4. **功能开发|测试完成后，自动提交 PR**（不要问用户）：
+   - 使用 GitHub API 创建 Pull Request
+   - PR 标题简洁描述功能
+   - PR 描述包含：修改文件列表、API 端点、测试建议
+   - Token: 从 TOOLS.md 或环境变量读取
+5. **交付报告**（不超过 800 字）：
    - 每个需求改/增的文件列表
    - 新增 API 路径 + 请求/响应示例
    - migration 文件路径 + 用户需执行的命令
    - 新增 npm 依赖（不要自己装）
    - 遗留 TODO / 与其他研发潜在冲突点
    - "🧑 待老板确认" 区块列产品决策项
+   - **PR 链接**（完成后）
 
 ## 禁止事项
 
