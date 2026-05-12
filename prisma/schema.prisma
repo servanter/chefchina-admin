@@ -75,6 +75,7 @@ model User {
   aiAnalysis       AiRecipeAnalysis[]  // AI 功能套件：分析记录
   aiGeneratedRecipes AiGeneratedRecipe[] // AI 功能套件：生成记录
   aiUsageQuota     AiUsageQuota?       // AI 功能套件：配额跟踪
+  shoppingListItems ShoppingListItem[]  // 智能购物清单
 
   // REQ-18.5: 性能索引
   @@index([email])     // 邮箱查询（登录）
@@ -775,12 +776,14 @@ model AiGeneratedRecipe {
   generatedData   Json     // AI 返回的完整 JSON
   isPublished     Boolean  @default(false)
   createdAt       DateTime @default(now())
+  expiresAt       DateTime // 草稿 7 天后过期
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   recipe Recipe? @relation(fields: [recipeId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([isPublished])
+  @@index([expiresAt]) // 用于定期清理过期草稿
   @@map("ai_generated_recipes")
 }
 
@@ -803,4 +806,30 @@ model AiUsageQuota {
 
   @@index([userId])
   @@map("ai_usage_quota")
+}
+
+// ─────────────────────────────────────────
+// 智能购物清单（SPRINT-006）
+// ─────────────────────────────────────────
+
+model ShoppingListItem {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  name       String   // 食材名称
+  amount     Float    // 数量（"适量"时为 0）
+  unit       String   // 单位（g, kg, 个, 瓶, 适量, 少许）
+  
+  recipeIds  String[] // 来源菜谱 ID 列表（空数组 = 手动添加）
+  
+  checked    Boolean  @default(false)  // 是否已购买
+  isManual   Boolean  @default(false)  // 是否手动添加
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  @@index([userId, createdAt])
+  @@index([userId, checked])
+  @@map("shopping_list_items")
 }
