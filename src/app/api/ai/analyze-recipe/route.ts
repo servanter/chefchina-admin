@@ -7,6 +7,9 @@ import { prisma } from "@/lib/prisma";
 import { checkAndUpdateQuota } from "@/lib/quota";
 import { callLLM, buildAnalysisPrompt } from "@/lib/llm";
 
+// ✅ FIX: Set timeout to 30 seconds (Next.js 15 route config)
+export const maxDuration = 30;
+
 export async function POST(req: NextRequest) {
   try {
     // 1. 认证
