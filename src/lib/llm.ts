@@ -1,18 +1,39 @@
 // src/lib/llm.ts
-// LLM 服务封装 - 使用阿里云 DeepSeek V4 Flash
-
-import OpenAI from "openai";
+// LLM 服务封装 - 使用阿里云 DeepSeek V4 Flash（直接 HTTP 请求）
 
 const MODEL = "deepseek-v4-flash";
+const BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1";
 
 /**
- * 初始化阿里云 DeepSeek 客户端（延迟初始化，避免构建时错误）
+ * 调用阿里云 DeepSeek API（OpenAI 兼容接口）
  */
-function getClient() {
-  return new OpenAI({
-    apiKey: process.env.DEEPSEEK_API_KEY || "sk-placeholder",
-    baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+async function callDeepSeekAPI(messages: Array<{ role: string; content: string }>, options: {
+  temperature?: number;
+  maxTokens?: number;
+} = {}) {
+  const { temperature = 0.7, maxTokens = 4096 } = options;
+  const apiKey = process.env.DEEPSEEK_API_KEY || "";
+
+  const response = await fetch(`${BASE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      messages,
+      temperature,
+      max_tokens: maxTokens,
+    }),
   });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`DeepSeek API error: ${response.status} ${error}`);
+  }
+
+  return await response.json();
 }
 
 /**
@@ -29,23 +50,17 @@ export async function callLLM(
     maxTokens?: number;
   } = {}
 ): Promise<any> {
-  const { temperature = 0.7, maxTokens = 4096 } = options;
-
-  const client = getClient(); // 延迟初始化
-
   try {
-    const response = await client.chat.completions.create({
-      model: MODEL,
-      messages: [
+    const response = await callDeepSeekAPI(
+      [
         {
           role: "system",
           content: "你是一位专业的营养师，擅长分析菜谱营养价值并提供个性化建议。请严格按照要求的 JSON 格式返回结果。",
         },
         { role: "user", content: prompt },
       ],
-      temperature,
-      max_tokens: maxTokens,
-    });
+      options
+    );
 
     // 获取文本内容
     const content = response.choices[0]?.message?.content?.trim() || "";
@@ -55,13 +70,12 @@ export async function callLLM(
   } catch (error) {
     console.error("LLM call error:", error);
 
-    // 错误分类（OpenAI SDK 错误处理）
-    if (error && typeof error === "object" && "status" in error) {
-      const status = (error as any).status;
-      if (status === 429) {
+    // 错误分类
+    if (error instanceof Error) {
+      if (error.message.includes("429")) {
         throw new Error("AI_RATE_LIMIT");
       }
-      if (status >= 500) {
+      if (error.message.includes("500") || error.message.includes("503")) {
         throw new Error("AI_SERVICE_ERROR");
       }
     }

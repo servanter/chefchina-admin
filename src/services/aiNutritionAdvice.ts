@@ -1,9 +1,10 @@
 /**
  * AI 营养建议服务
- * 使用阿里云 DeepSeek V4 Flash 大模型
+ * 使用阿里云 DeepSeek V4 Flash 大模型（直接 HTTP 请求）
  */
 
-import OpenAI from 'openai'
+const MODEL = 'deepseek-v4-flash';
+const BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
 
 export interface NutritionProfile {
   goal: string
@@ -24,19 +25,12 @@ export interface WeeklyData {
   daysRecorded: number
 }
 
-// 阿里云 DeepSeek 配置
-const client = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY || 'sk-your-deepseek-api-key',
-  baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',  // 阿里云 URL
-})
-
-const MODEL = 'deepseek-v4-flash'  // 阿里云支持的 DeepSeek 模型
-
 /**
  * 调用阿里云 DeepSeek 生成建议
  */
 async function callAI(prompt: string): Promise<{ content: string; source: 'ai' | 'rule' }> {
   try {
+    const apiKey = process.env.DEEPSEEK_API_KEY || '';
     const messages: Array<{ role: 'system' | 'user'; content: string }> = [
       {
         role: 'system',
@@ -60,15 +54,28 @@ async function callAI(prompt: string): Promise<{ content: string; source: 'ai' |
     })
     console.log('\n==============================\n')
 
-    const response = await client.chat.completions.create({
-      model: MODEL,
-      messages,
-      temperature: 0.7,
-      max_tokens: 200,
-    })
+    const response = await fetch(`${BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages,
+        temperature: 0.7,
+        max_tokens: 200,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
 
     return {
-      content: response.choices[0]?.message?.content?.trim() || '暂无建议',
+      content: data.choices[0]?.message?.content?.trim() || '暂无建议',
       source: 'ai'
     }
   } catch (error) {
