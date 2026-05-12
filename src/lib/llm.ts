@@ -60,9 +60,15 @@ If you provide any Chinese text, that would be a failure.`
 所有分析、解释和建议都必须用中文书写。
 请严格按照要求的 JSON 格式返回结果。`;
 
-  // ✅ 添加日志
-  console.log('[LLM] System prompt:', systemPrompt.substring(0, 200) + '...');
-  console.log('[LLM] User prompt preview:', prompt.substring(0, 300) + '...');
+  // ✅ 打印完整的 System Prompt
+  console.log('==================== SYSTEM PROMPT (START) ====================');
+  console.log(systemPrompt);
+  console.log('==================== SYSTEM PROMPT (END) ====================');
+  
+  // ✅ 打印完整的 User Prompt
+  console.log('==================== USER PROMPT (START) ====================');
+  console.log(prompt);
+  console.log('==================== USER PROMPT (END) ====================');
 
   try {
     const response = await client.chat.completions.create({
@@ -81,9 +87,10 @@ If you provide any Chinese text, that would be a failure.`
     // 获取文本内容
     const content = response.choices[0]?.message?.content?.trim() || "";
     
-    // ✅ 添加日志
-    console.log('[LLM] Response received, length:', content.length);
-    console.log('[LLM] Response preview:', content.substring(0, 200) + '...');
+    // ✅ 打印完整的 LLM 响应
+    console.log('==================== LLM RESPONSE (START) ====================');
+    console.log(content);
+    console.log('==================== LLM RESPONSE (END) ====================');
 
     // 解析 JSON(LLM 可能包裹在 ```json ... ``` 中)
     return parseAIResponse(content);
