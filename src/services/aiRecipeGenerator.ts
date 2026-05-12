@@ -151,6 +151,7 @@ ${input.dietaryRestrictions?.length ? `- 饮食限制: ${input.dietaryRestrictio
   let parsed: GeneratedRecipe | null = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
+      console.log(`[AI Recipe Generator] Attempt ${attempt + 1}/3`);
       const response = await callLLM(userPrompt, {
         temperature: 0.8, // 提高创意性
         maxTokens: 4096,
@@ -196,15 +197,17 @@ ${input.dietaryRestrictions?.length ? `- 饮食限制: ${input.dietaryRestrictio
       }
 
       return parsed;
-    } catch (error) {
+    } catch (error: any) {
       console.error(`[AI Generator] Attempt ${attempt + 1} failed:`, error);
+      console.error(`[AI Generator] Error message:`, error?.message);
+      console.error(`[AI Generator] Error stack:`, error?.stack);
       if (attempt === 2) {
-        throw new Error("AI_INVALID_RESPONSE");
+        throw new Error(`AI_INVALID_RESPONSE: ${error?.message || 'Unknown error'}`);
       }
       // 重试
       await new Promise((resolve) => setTimeout(resolve, 1000 * (attempt + 1)));
     }
   }
 
-  throw new Error("AI_INVALID_RESPONSE");
+  throw new Error("AI_INVALID_RESPONSE: All 3 attempts failed");
 }

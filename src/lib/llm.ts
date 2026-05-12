@@ -71,6 +71,10 @@ If you provide any Chinese text, that would be a failure.`
   console.log('==================== USER PROMPT (END) ====================');
 
   try {
+    console.log('[LLM] Starting API call to DeepSeek');
+    console.log('[LLM] Model:', MODEL);
+    console.log('[LLM] API Key:', process.env.DEEPSEEK_API_KEY ? 'Set' : 'NOT SET');
+    
     const response = await client.chat.completions.create({
       model: MODEL,
       messages: [
@@ -82,10 +86,16 @@ If you provide any Chinese text, that would be a failure.`
       ],
       temperature,
       max_tokens: maxTokens,
+      timeout: 60000, // ✅ FIX: 增加超时时间到 60 秒
     });
 
     // 获取文本内容
     const content = response.choices[0]?.message?.content?.trim() || "";
+    
+    if (!content) {
+      console.error('[LLM] Empty response from API');
+      throw new Error("AI_INVALID_RESPONSE: Empty content");
+    }
     
     // ✅ 打印完整的 LLM 响应
     console.log('==================== LLM RESPONSE (START) ====================');
@@ -94,8 +104,12 @@ If you provide any Chinese text, that would be a failure.`
 
     // 解析 JSON(LLM 可能包裹在 ```json ... ``` 中)
     return parseAIResponse(content);
-  } catch (error) {
-    console.error("LLM call error:", error);
+  } catch (error: any) {
+    console.error("[LLM] Call error:", error);
+    console.error("[LLM] Error message:", error?.message);
+    console.error("[LLM] Error stack:", error?.stack);
+    console.error("[LLM] Error code:", error?.code);
+    console.error("[LLM] Error status:", error?.status);
 
     // 错误分类(OpenAI SDK 错误处理)
     if (error && typeof error === "object" && "status" in error) {

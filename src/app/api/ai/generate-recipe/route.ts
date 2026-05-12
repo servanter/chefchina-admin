@@ -94,6 +94,9 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: any) {
     console.error("[AI Generate] Error:", error);
+    console.error("[AI Generate] Error stack:", error?.stack);
+    console.error("[AI Generate] Error message:", error?.message);
+    console.error("[AI Generate] Error name:", error?.name);
 
     // 错误分类
     if (error.message === "QUOTA_EXCEEDED") {
@@ -103,14 +106,24 @@ export async function POST(req: NextRequest) {
       return errorResponse(
         "AI 生成失败，请重试",
         500,
-        ERROR_CODES.AI_SERVICE_ERROR
+        ERROR_CODES.AI_SERVICE_ERROR,
+        process.env.NODE_ENV === "development" ? { details: error.stack } : undefined
       );
     }
     if (error.message === "AI_SERVICE_ERROR") {
       return errorResponse(
         "AI 服务暂时不可用",
         503,
-        ERROR_CODES.AI_SERVICE_ERROR
+        ERROR_CODES.AI_SERVICE_ERROR,
+        process.env.NODE_ENV === "development" ? { details: error.stack } : undefined
+      );
+    }
+    if (error.message === "AI_UNKNOWN_ERROR") {
+      return errorResponse(
+        "AI 调用失败，请检查配置",
+        500,
+        ERROR_CODES.AI_SERVICE_ERROR,
+        process.env.NODE_ENV === "development" ? { details: error.message, stack: error.stack } : undefined
       );
     }
 
