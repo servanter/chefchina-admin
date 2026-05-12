@@ -10,7 +10,9 @@ import { requireAuth } from "@/lib/auth-guard";
 export async function GET(req: NextRequest) {
   try {
     // 1. 认证检查
-    const { userId } = await requireAuth(req);
+    const auth = requireAuth(req);
+    if (auth instanceof Response) return auth;
+    const userId = auth.sub;
 
     // 2. 查询用户的生成历史
     const items = await prisma.aiGeneratedRecipe.findMany({

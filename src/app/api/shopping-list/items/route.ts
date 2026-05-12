@@ -9,7 +9,9 @@ import { requireAuth } from '@/lib/auth-guard';
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await requireAuth(req);
+    const auth = requireAuth(req);
+    if (auth instanceof Response) return auth;
+    const userId = auth.sub;
     const body = await req.json();
     const { name, amount, unit } = body;
 

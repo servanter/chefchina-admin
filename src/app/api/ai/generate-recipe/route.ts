@@ -31,7 +31,9 @@ const GenerateRecipeSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     // 1. 认证检查
-    const { userId } = await requireAuth(req);
+    const auth = requireAuth(req);
+    if (auth instanceof Response) return auth;
+    const userId = auth.sub;
 
     // 2. 解析请求体
     const body = await req.json();

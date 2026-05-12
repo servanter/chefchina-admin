@@ -11,7 +11,9 @@ import { mergeIngredients } from '@/lib/shoppingListMerger';
 export async function GET(req: NextRequest) {
   try {
     // 认证检查
-    const userId = await requireAuth(req);
+    const auth = requireAuth(req);
+    if (auth instanceof Response) return auth;
+    const userId = auth.sub;
 
     // 查询用户的购物清单
     let items = await prisma.shoppingListItem.findMany({

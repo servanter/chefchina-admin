@@ -14,15 +14,20 @@ import { requireAuth } from "@/lib/auth-guard";
 // GET /api/ai/generated-recipes/:id
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 1. 认证检查
-    const { userId } = await requireAuth(req);
+    const auth = requireAuth(req);
+    if (auth instanceof Response) return auth;
+    const userId = auth.sub;
 
-    // 2. 查询生成记录
+    // 2. Await params (Next.js 16)
+    const { id } = await params;
+
+    // 3. 查询生成记录
     const generated = await prisma.aiGeneratedRecipe.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!generated) {

@@ -10,7 +10,9 @@ import { mergeIngredients } from '@/lib/shoppingListMerger';
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await requireAuth(req);
+    const auth = requireAuth(req);
+    if (auth instanceof Response) return auth;
+    const userId = auth.sub;
     const body = await req.json();
     const { recipeIds, keepManual = true } = body;
 

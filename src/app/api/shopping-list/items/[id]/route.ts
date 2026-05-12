@@ -12,11 +12,13 @@ import { requireAuth } from '@/lib/auth-guard';
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await requireAuth(req);
-    const { id } = params;
+    const auth = requireAuth(req);
+    if (auth instanceof Response) return auth;
+    const userId = auth.sub;
+    const { id } = await params;
     const body = await req.json();
 
     // 验证该食材是否属于当前用户
@@ -72,11 +74,13 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = await requireAuth(req);
-    const { id } = params;
+    const auth = requireAuth(req);
+    if (auth instanceof Response) return auth;
+    const userId = auth.sub;
+    const { id } = await params;
 
     // 验证该食材是否属于当前用户
     const existing = await prisma.shoppingListItem.findUnique({

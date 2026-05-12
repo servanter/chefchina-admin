@@ -56,19 +56,24 @@ const PublishSchema = z.object({
 // POST /api/ai/generated-recipes/:id/publish
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     // 1. 认证检查
-    const { userId } = await requireAuth(req);
+    const auth = requireAuth(req);
+    if (auth instanceof Response) return auth;
+    const userId = auth.sub;
 
-    // 2. 解析请求体
+    // 2. Await params (Next.js 16)
+    const { id } = await params;
+
+    // 3. 解析请求体
     const body = await req.json();
     const editedData = PublishSchema.parse(body);
 
-    // 3. 查询生成记录
+    // 4. 查询生成记录
     const generated = await prisma.aiGeneratedRecipe.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!generated) {
@@ -167,14 +172,14 @@ export async function POST(
 
     // 10. 更新生成记录
     await prisma.aiGeneratedRecipe.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         isPublished: true,
         recipeId: recipe.id,
       },
     });
 
-    console.log(`[AI Publish] Published recipe ${recipe.id} from generated ${params.id}`);
+    console.log(`[AI Publish] Published recipe ${recipe.id} from generated ${id}`);
 
     // 11. 返回结果
     return successResponse({
