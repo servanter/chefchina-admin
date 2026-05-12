@@ -72,6 +72,9 @@ model User {
   dailyIntakes  DailyIntake[]      // SPRINT-004: 每日摄入
   nutritionReports NutritionReport[] // SPRINT-004: 周报告
   subscription  Subscription?       // Premium 订阅
+  aiAnalysis       AiRecipeAnalysis[]  // AI 功能套件：分析记录
+  aiGeneratedRecipes AiGeneratedRecipe[] // AI 功能套件：生成记录
+  aiUsageQuota     AiUsageQuota?       // AI 功能套件：配额跟踪
 
   // REQ-18.5: 性能索引
   @@index([email])     // 邮箱查询（登录）
@@ -151,6 +154,8 @@ model Recipe {
   topics        RecipeTopic[] // REQ-12.3: 话题关联
   browseHistory BrowseHistory[] // REQ-12.7: 浏览历史
   dailyIntakes  DailyIntake[]   // SPRINT-004: 每日摄入关联
+  aiAnalysis       AiRecipeAnalysis[]  // AI 功能套件：分析记录
+  aiGeneratedFrom  AiGeneratedRecipe[] // AI 功能套件：被 AI 生成关联
 
   // REQ-18.5: 性能索引
   @@index([authorId])           // 用户的菜谱列表
@@ -730,4 +735,72 @@ enum PaymentStatus {
   FAILED
   REFUNDED
   CANCELLED
+}
+
+// ─────────────────────────────────────────
+// AI 功能套件（SPRINT-005）
+// ─────────────────────────────────────────
+
+// 1. AI 菜谱分析结果（缓存）
+model AiRecipeAnalysis {
+  id              String   @id @default(cuid())
+  userId          String
+  recipeId        String
+  matchScore      Int      // 0-100
+  summary         String   @db.Text
+  pros            String[] // 优点列表
+  cons            String[] // 缺点列表
+  modifications   String[] // 改良建议
+  alternatives    Json     // [{ recipeId, title, reason }]
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime // 7天后过期
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, recipeId], name: "user_recipe_unique")
+  @@index([userId, createdAt])
+  @@index([expiresAt]) // 用于定期清理
+  @@map("ai_recipe_analysis")
+}
+
+// 2. AI 生成菜谱历史
+model AiGeneratedRecipe {
+  id              String   @id @default(cuid())
+  userId          String
+  recipeId        String?  // 发布后关联
+  inputIngredients String[] // 用户输入的食材
+  style           String?  // 川菜/粤菜/日式/西式
+  difficulty      String?  // EASY/MEDIUM/HARD
+  generatedData   Json     // AI 返回的完整 JSON
+  isPublished     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipe Recipe? @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([isPublished])
+  @@map("ai_generated_recipes")
+}
+
+// 3. AI 使用配额跟踪
+model AiUsageQuota {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  
+  // 分析功能（每日重置）
+  analysisUsedToday     Int      @default(0)
+  analysisResetAt       DateTime // 下次重置时间（明天 00:00）
+  
+  // 生成功能（每月重置）
+  generatorUsedThisMonth Int     @default(0)
+  generatorResetAt      DateTime // 下次重置时间（下月 1 号）
+  
+  updatedAt             DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("ai_usage_quota")
 }
