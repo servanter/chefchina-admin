@@ -7,6 +7,9 @@ import { prisma } from "@/lib/prisma";
 import { checkAndUpdateQuota } from "@/lib/quota";
 import { callLLM, buildAnalysisPrompt } from "@/lib/llm";
 
+// ✅ FIX: Set timeout to 30 seconds (Next.js 15 route config)
+export const maxDuration = 30;
+
 export async function POST(req: NextRequest) {
   try {
     // 1. 认证
@@ -17,7 +20,7 @@ export async function POST(req: NextRequest) {
     const userId = authResult.sub;
 
     // 2. 解析请求
-    const { recipeId } = await req.json();
+    const { recipeId, language = 'zh' } = await req.json(); // ✅ FIX: 接收 language 参数
     if (!recipeId) {
       return NextResponse.json(
         { success: false, error: "RECIPE_ID_REQUIRED" },
@@ -120,7 +123,8 @@ export async function POST(req: NextRequest) {
         servings: recipe.servings,
         ingredients: recipe.ingredients,
       },
-      profile
+      profile,
+      language as 'zh' | 'en' // ✅ FIX: 传递 language 参数
     );
     const analysis = await callLLM(prompt, { temperature: 0.7 });
 

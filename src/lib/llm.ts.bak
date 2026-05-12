@@ -85,6 +85,95 @@ function parseAIResponse(content: string): any {
   }
 }
 
+/**
+ * 构建菜谱适配分析 Prompt
+ */
+export function buildAnalysisPrompt(
+  recipe: {
+    titleZh: string;
+    calories: number;
+    protein: number;
+    fat: number;
+    carbs: number;
+    sodium?: number | null;
+    sugar?: number | null;
+    fiber?: number | null;
+    servings?: number | null;
+    ingredients: Array<{ nameZh: string }>;
+  },
+  profile: {
+    goal: string;
+    dailyCalories: number;
+    proteinPercent: number;
+    fatPercent: number;
+    carbsPercent: number;
+    restrictions: string[];
+    sodiumLimit?: number | null;
+    sugarLimit?: number | null;
+    fiberMin?: number | null;
+  }
+): string {
+  const goalMap: Record<string, string> = {
+    weight_loss: "减脂",
+    muscle_gain: "增肌",
+    maintain: "维持体重",
+  };
+
+  return `
+你是专业营养师。请分析这道菜谱是否适合用户的健康目标。
+
+## 用户健康档案
+- 目标: ${goalMap[profile.goal] || profile.goal}
+- 每日热量目标: ${profile.dailyCalories} kcal
+- 营养比例: 蛋白质 ${profile.proteinPercent}%, 脂肪 ${profile.fatPercent}%, 碳水 ${profile.carbsPercent}%
+${profile.restrictions.length > 0 ? `- 饮食限制: ${profile.restrictions.join(", ")}` : ""}
+${profile.sodiumLimit ? `- 钠限制: ${profile.sodiumLimit} mg/天` : ""}
+${profile.sugarLimit ? `- 糖限制: ${profile.sugarLimit} g/天` : ""}
+${profile.fiberMin ? `- 纤维最低: ${profile.fiberMin} g/天` : ""}
+
+## 菜谱信息
+- 菜名: ${recipe.titleZh}
+- 每份热量: ${recipe.calories} kcal (${recipe.servings || 1}人份)
+- 蛋白质: ${recipe.protein}g
+- 脂肪: ${recipe.fat}g
+- 碳水: ${recipe.carbs}g
+${recipe.sodium ? `- 钠: ${recipe.sodium}mg` : ""}
+${recipe.sugar ? `- 糖: ${recipe.sugar}g` : ""}
+${recipe.fiber ? `- 纤维: ${recipe.fiber}g` : ""}
+- 食材: ${recipe.ingredients.map((i) => i.nameZh).join(", ")}
+
+## 分析要求
+1. 计算适配度评分（0-100分）
+2. 列出优点（2-4条）
+3. 列出需要注意的地方（1-3条）
+4. 提供改良建议（2-3条具体可操作的建议）
+5. 不要推荐替代菜谱（我们会通过数据库查询）
+
+请严格按照以下 JSON 格式返回：
+\`\`\`json
+{
+  "matchScore": 85,
+  "summary": "这道菜谱基本符合您的减脂目标，蛋白质含量充足，但钠含量略高。",
+  "pros": [
+    "高蛋白质（35g），有助于肌肉维持",
+    "热量适中（280kcal），适合减脂期",
+    "富含膳食纤维（4g），增强饱腹感"
+  ],
+  "cons": [
+    "钠含量偏高（180mg），建议减少酱油用量",
+    "脂肪占比略高（26%），可用蒸煮替代煎炸"
+  ],
+  "modifications": [
+    "将酱油用量减少至原来的50%，或使用低钠酱油",
+    "鸡胸肉用蒸煮代替煎炸，可减少5-8g脂肪",
+    "增加西兰花份量至200g，补充更多纤维"
+  ]
+}
+\`\`\`
+
+重要：只返回 JSON，不要有其他文字说明。
+`.trim();
+}
 
 /**
  * 构建菜谱生成 Prompt
@@ -187,159 +276,5 @@ ${input.dietaryRestrictions && input.dietaryRestrictions.length > 0 ? `- 饮食�
 1. 只返回 JSON，不要有其他文字
 2. 确保所有字段都存在且类型正确
 3. 营养数据要合理（calories 应该等于 4*protein + 4*carbs + 9*fat）
-`.trim();
-}
-export function buildAnalysisPrompt(
-  recipe: {
-    titleZh: string;
-    calories: number;
-    protein: number;
-    fat: number;
-    carbs: number;
-    sodium?: number | null;
-    sugar?: number | null;
-    fiber?: number | null;
-    servings?: number | null;
-    ingredients: Array<{ nameZh: string }>;
-  },
-  profile: {
-    goal: string;
-    dailyCalories: number;
-    proteinPercent: number;
-    fatPercent: number;
-    carbsPercent: number;
-    restrictions: string[];
-    sodiumLimit?: number | null;
-    sugarLimit?: number | null;
-    fiberMin?: number | null;
-  },
-  language: 'zh' | 'en' = 'zh' // ✅ FIX: 新增language参数
-): string {
-  const isEnglish = language === 'en';
-  
-  // ✅ FIX: 根据语言选择prompt
-  if (isEnglish) {
-    const goalMap: Record<string, string> = {
-      weight_loss: "Weight Loss",
-      muscle_gain: "Muscle Gain",
-      maintain: "Maintain Weight",
-    };
-
-    return `
-You are a professional nutritionist. Analyze if this recipe suits the user's health goals.
-
-## User Health Profile
-- Goal: ${goalMap[profile.goal] || profile.goal}
-- Daily Calorie Target: ${profile.dailyCalories} kcal
-- Macro Ratio: Protein ${profile.proteinPercent}%, Fat ${profile.fatPercent}%, Carbs ${profile.carbsPercent}%
-${profile.restrictions.length > 0 ? `- Dietary Restrictions: ${profile.restrictions.join(", ")}` : ""}
-${profile.sodiumLimit ? `- Sodium Limit: ${profile.sodiumLimit} mg/day` : ""}
-${profile.sugarLimit ? `- Sugar Limit: ${profile.sugarLimit} g/day` : ""}
-${profile.fiberMin ? `- Fiber Minimum: ${profile.fiberMin} g/day` : ""}
-
-## Recipe Information
-- Dish: ${recipe.titleZh}
-- Calories per serving: ${recipe.calories} kcal (${recipe.servings || 1} servings)
-- Protein: ${recipe.protein}g
-- Fat: ${recipe.fat}g
-- Carbs: ${recipe.carbs}g
-${recipe.sodium ? `- Sodium: ${recipe.sodium}mg` : ""}
-${recipe.sugar ? `- Sugar: ${recipe.sugar}g` : ""}
-${recipe.fiber ? `- Fiber: ${recipe.fiber}g` : ""}
-- Ingredients: ${recipe.ingredients.map((i) => i.nameZh).join(", ")}
-
-## Analysis Requirements
-1. Calculate match score (0-100)
-2. List pros (2-4 items)
-3. List cons (1-3 items)
-4. Provide actionable modifications (2-3 specific suggestions)
-5. Do not recommend alternative recipes (we query from database)
-
-Please respond in JSON format:
-\`\`\`json
-{
-  "matchScore": 85,
-  "summary": "This recipe basically fits your weight loss goal with sufficient protein, but sodium content is slightly high.",
-  "pros": [
-    "High protein (35g), helps muscle maintenance",
-    "Moderate calories (280kcal), suitable for weight loss",
-    "Rich in fiber (4g), enhances satiety"
-  ],
-  "cons": [
-    "Sodium content is high (180mg), suggest reducing soy sauce",
-    "Fat ratio is slightly high (26%), can use steaming instead of frying"
-  ],
-  "modifications": [
-    "Reduce soy sauce to 50% or use low-sodium soy sauce",
-    "Steam chicken breast instead of frying to reduce 5-8g fat",
-    "Increase broccoli to 200g for more fiber"
-  ]
-}
-\`\`\`
-
-Important: Return JSON only, no other text. Please respond in English.
-`.trim();
-  }
-  
-  // 中文prompt
-  const goalMap: Record<string, string> = {
-    weight_loss: "减脂",
-    muscle_gain: "增肌",
-    maintain: "维持体重",
-  };
-
-  return `
-你是专业营养师。请分析这道菜谱是否适合用户的健康目标。
-
-## 用户健康档案
-- 目标: ${goalMap[profile.goal] || profile.goal}
-- 每日热量目标: ${profile.dailyCalories} kcal
-- 营养比例: 蛋白质 ${profile.proteinPercent}%, 脂肪 ${profile.fatPercent}%, 碳水 ${profile.carbsPercent}%
-${profile.restrictions.length > 0 ? `- 饮食限制: ${profile.restrictions.join(", ")}` : ""}
-${profile.sodiumLimit ? `- 钠限制: ${profile.sodiumLimit} mg/天` : ""}
-${profile.sugarLimit ? `- 糖限制: ${profile.sugarLimit} g/天` : ""}
-${profile.fiberMin ? `- 纤维最低: ${profile.fiberMin} g/天` : ""}
-
-## 菜谱信息
-- 菜名: ${recipe.titleZh}
-- 每份热量: ${recipe.calories} kcal (${recipe.servings || 1}人份)
-- 蛋白质: ${recipe.protein}g
-- 脂肪: ${recipe.fat}g
-- 碳水: ${recipe.carbs}g
-${recipe.sodium ? `- 钠: ${recipe.sodium}mg` : ""}
-${recipe.sugar ? `- 糖: ${recipe.sugar}g` : ""}
-${recipe.fiber ? `- 纤维: ${recipe.fiber}g` : ""}
-- 食材: ${recipe.ingredients.map((i) => i.nameZh).join(", ")}
-
-## 分析要求
-1. 计算适配度评分（0-100分）
-2. 列出优点（2-4条）
-3. 列出需要注意的地方（1-3条）
-4. 提供改良建议（2-3条具体可操作的建议）
-5. 不要推荐替代菜谱（我们会通过数据库查询）
-
-请严格按照以下 JSON 格式返回：
-\`\`\`json
-{
-  "matchScore": 85,
-  "summary": "这道菜谱基本符合您的减脂目标，蛋白质含量充足，但钠含量略高。",
-  "pros": [
-    "高蛋白质（35g），有助于肌肉维持",
-    "热量适中（280kcal），适合减脂期",
-    "富含膳食纤维（4g），增强饱腹感"
-  ],
-  "cons": [
-    "钠含量偏高（180mg），建议减少酱油用量",
-    "脂肪占比略高（26%），可用蒸煮替代煎炸"
-  ],
-  "modifications": [
-    "将酱油用量减少至原来的50%，或使用低钠酱油",
-    "鸡胸肉用蒸煮代替煎炸，可减少5-8g脂肪",
-    "增加西兰花份量至200g，补充更多纤维"
-  ]
-}
-\`\`\`
-
-重要：只返回 JSON，不要有其他文字说明。请用中文回答。
 `.trim();
 }
