@@ -10,7 +10,7 @@ import {
   handleError,
   ERROR_CODES,
 } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth } from "@/lib/auth-guard";
 import { checkAndUpdateQuota } from "@/lib/quota";
 import { generateRecipe, GeneratorInput } from "@/services/aiRecipeGenerator";
 

@@ -4,7 +4,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { successResponse, handleError } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth } from "@/lib/auth-guard";
 
 // GET /api/ai/generated-recipes
 export async function GET(req: NextRequest) {

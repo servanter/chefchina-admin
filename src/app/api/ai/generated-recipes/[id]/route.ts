@@ -9,7 +9,7 @@ import {
   handleError,
   ERROR_CODES,
 } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth } from "@/lib/auth-guard";
 
 // GET /api/ai/generated-recipes/:id
 export async function GET(

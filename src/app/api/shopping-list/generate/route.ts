@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireAuth } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth-guard';
 import { mergeIngredients } from '@/lib/shoppingListMerger';
 
 export async function POST(req: NextRequest) {

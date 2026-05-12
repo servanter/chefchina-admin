@@ -10,7 +10,7 @@ import {
   handleError,
   ERROR_CODES,
 } from "@/lib/api";
-import { requireAuth } from "@/lib/auth";
+import { requireAuth } from "@/lib/auth-guard";
 
 // 发布请求 Schema（允许编辑）
 const PublishSchema = z.object({
