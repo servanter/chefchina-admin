@@ -1,13 +1,19 @@
 // src/lib/llm.ts
-// LLM 服务封装 - 使用工蜂 AI (Claude Sonnet 4.5)
+// LLM 服务封装 - 使用阿里云 DeepSeek V4 Flash
 
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 
-// 初始化 Anthropic 客户端
-const client = new Anthropic({
-  apiKey: process.env.GONGFENG_AI_API_KEY || "",
-  baseURL: process.env.GONGFENG_AI_BASE_URL || "https://gongfeng.ai/v1",
-});
+const MODEL = "deepseek-v4-flash";
+
+/**
+ * 初始化阿里云 DeepSeek 客户端（延迟初始化，避免构建时错误）
+ */
+function getClient() {
+  return new OpenAI({
+    apiKey: process.env.DEEPSEEK_API_KEY || "sk-placeholder",
+    baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  });
+}
 
 /**
  * 调用 LLM
@@ -25,29 +31,37 @@ export async function callLLM(
 ): Promise<any> {
   const { temperature = 0.7, maxTokens = 4096 } = options;
 
+  const client = getClient(); // 延迟初始化
+
   try {
-    const response = await client.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: maxTokens,
+    const response = await client.chat.completions.create({
+      model: MODEL,
+      messages: [
+        {
+          role: "system",
+          content: "你是一位专业的营养师，擅长分析菜谱营养价值并提供个性化建议。请严格按照要求的 JSON 格式返回结果。",
+        },
+        { role: "user", content: prompt },
+      ],
       temperature,
-      messages: [{ role: "user", content: prompt }],
+      max_tokens: maxTokens,
     });
 
     // 获取文本内容
-    const content =
-      response.content[0].type === "text" ? response.content[0].text : "";
+    const content = response.choices[0]?.message?.content?.trim() || "";
 
     // 解析 JSON（LLM 可能包裹在 ```json ... ``` 中）
     return parseAIResponse(content);
   } catch (error) {
     console.error("LLM call error:", error);
 
-    // 错误分类
-    if (error instanceof Anthropic.APIError) {
-      if (error.status === 429) {
+    // 错误分类（OpenAI SDK 错误处理）
+    if (error && typeof error === "object" && "status" in error) {
+      const status = (error as any).status;
+      if (status === 429) {
         throw new Error("AI_RATE_LIMIT");
       }
-      if (error.status >= 500) {
+      if (status >= 500) {
         throw new Error("AI_SERVICE_ERROR");
       }
     }
