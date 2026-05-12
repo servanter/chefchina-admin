@@ -21,7 +21,14 @@ export async function POST(req: NextRequest) {
 
     // 2. 解析请求
     const { recipeId, language = 'zh' } = await req.json(); // ✅ FIX: 接收 language 参数
-    console.log('[AI Analysis] Received language:', language, 'recipeId:', recipeId);
+    
+    // ✅ 添加完整日志
+    console.log('[AI Analysis API] Request:', { 
+      userId, 
+      recipeId, 
+      language,
+      timestamp: new Date().toISOString()
+    });
     if (!recipeId) {
       return NextResponse.json(
         { success: false, error: "RECIPE_ID_REQUIRED" },
@@ -127,10 +134,18 @@ export async function POST(req: NextRequest) {
       profile,
       language as 'zh' | 'en' // ✅ FIX: 传递 language 参数
     );
+    
+    // ✅ 添加日志
+    console.log('[AI Analysis API] Calling LLM with language:', language);
+    console.log('[AI Analysis API] Prompt preview:', prompt.substring(0, 500));
+    
     const analysis = await callLLM(prompt, { 
       temperature: 0.7,
       language: language as 'zh' | 'en' // ✅ FIX: 传递 language 参数到 callLLM
     });
+    
+    // ✅ 添加日志
+    console.log('[AI Analysis API] LLM response preview:', JSON.stringify(analysis).substring(0, 200));
 
     // 验证结果格式
     if (

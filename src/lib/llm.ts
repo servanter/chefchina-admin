@@ -32,15 +32,37 @@ export async function callLLM(
   } = {}
 ): Promise<any> {
   const { temperature = 0.7, maxTokens = 4096, language = 'zh' } = options;
+  
+  // ✅ 添加详细日志
+  console.log('[LLM] callLLM params:', { 
+    language, 
+    temperature,
+    maxTokens,
+    promptLength: prompt.length 
+  });
+  
   const client = getClient();
 
-  // ✅ FIX: 根据语言选择系统提示词
+  // ✅ FIX: 根据语言选择系统提示词 + 强化语言指令
   const systemPrompt = language === 'en'
-    ? "You are a professional nutritionist specializing in recipe nutrition analysis and personalized recommendations. IMPORTANT: You MUST respond in English only. Return results strictly in the required JSON format."
-    : "你是一位专业的营养师,擅长分析菜谱营养价值并提供个性化建议。重要:请务必用中文回答。请严格按照要求的 JSON 格式返回结果。";
+    ? `You are a professional nutritionist specializing in recipe nutrition analysis and personalized recommendations.
 
-  console.log('[LLM] Using language:', language);
-  console.log('[LLM] System prompt preview:', systemPrompt.substring(0, 100) + '...');
+CRITICAL REQUIREMENT: You MUST respond in English language only.
+Do NOT use any Chinese characters in your response.
+All analysis, explanations, and recommendations MUST be written in English.
+Return results strictly in the required JSON format.
+
+If you provide any Chinese text, that would be a failure.`
+    : `你是一位专业的营养师,擅长分析菜谱营养价值并提供个性化建议。
+
+重要要求：你必须只用中文回答。
+不要使用任何英文字符（除了专业术语）。
+所有分析、解释和建议都必须用中文书写。
+请严格按照要求的 JSON 格式返回结果。`;
+
+  // ✅ 添加日志
+  console.log('[LLM] System prompt:', systemPrompt.substring(0, 200) + '...');
+  console.log('[LLM] User prompt preview:', prompt.substring(0, 300) + '...');
 
   try {
     const response = await client.chat.completions.create({
@@ -58,6 +80,10 @@ export async function callLLM(
 
     // 获取文本内容
     const content = response.choices[0]?.message?.content?.trim() || "";
+    
+    // ✅ 添加日志
+    console.log('[LLM] Response received, length:', content.length);
+    console.log('[LLM] Response preview:', content.substring(0, 200) + '...');
 
     // 解析 JSON(LLM 可能包裹在 ```json ... ``` 中)
     return parseAIResponse(content);
@@ -225,6 +251,11 @@ export function buildAnalysisPrompt(
   },
   language: 'zh' | 'en' = 'zh' // ✅ FIX: 新增language参数
 ): string {
+  // ✅ 添加日志
+  console.log('[buildAnalysisPrompt] Language:', language);
+  console.log('[buildAnalysisPrompt] Recipe:', recipe.titleZh);
+  console.log('[buildAnalysisPrompt] Profile goal:', profile.goal);
+  
   const isEnglish = language === 'en';
 
   // ✅ FIX: 根据语言选择prompt
