@@ -85,14 +85,6 @@ function parseAIResponse(content: string): any {
   }
 }
 
-/**
- * 构建菜谱适配分析 Prompt
- */
-\`\`\`
-
-重要：只返回 JSON，不要有其他文字说明。
-`.trim();
-}
 
 /**
  * 构建菜谱生成 Prompt
