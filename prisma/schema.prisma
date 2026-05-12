@@ -775,12 +775,14 @@ model AiGeneratedRecipe {
   generatedData   Json     // AI 返回的完整 JSON
   isPublished     Boolean  @default(false)
   createdAt       DateTime @default(now())
+  expiresAt       DateTime // 草稿 7 天后过期
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
   recipe Recipe? @relation(fields: [recipeId], references: [id], onDelete: SetNull)
 
   @@index([userId, createdAt])
   @@index([isPublished])
+  @@index([expiresAt]) // 用于定期清理过期草稿
   @@map("ai_generated_recipes")
 }
 
