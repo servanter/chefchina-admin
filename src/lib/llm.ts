@@ -71,18 +71,23 @@ If you provide any Chinese text, that would be a failure.`
   console.log('==================== USER PROMPT (END) ====================');
 
   try {
-    const response = await client.chat.completions.create({
-      model: MODEL,
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt,
-        },
-        { role: "user", content: prompt },
-      ],
-      temperature,
-      max_tokens: maxTokens,
-    });
+    const response = await client.chat.completions.create(
+      {
+        model: MODEL,
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          { role: "user", content: prompt },
+        ],
+        temperature,
+        max_tokens: maxTokens,
+      },
+      {
+        timeout: 60000, // 60 second timeout
+      }
+    );
 
     // 获取文本内容
     const content = response.choices[0]?.message?.content?.trim() || "";
