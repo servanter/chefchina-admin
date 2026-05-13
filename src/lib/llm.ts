@@ -12,6 +12,7 @@ function getClient() {
   return new OpenAI({
     apiKey: process.env.DEEPSEEK_API_KEY || "sk-placeholder",
     baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    timeout: 60000, // ✅ FIX: 在 client 级别设置 60 秒超时
   });
 }
 
