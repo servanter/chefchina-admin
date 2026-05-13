@@ -12,6 +12,7 @@ function getClient() {
   return new OpenAI({
     apiKey: process.env.DEEPSEEK_API_KEY || "sk-placeholder",
     baseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    timeout: 60000, // ✅ FIX: 在 client 级别设置 60 秒超时
   });
 }
 
@@ -71,23 +72,18 @@ If you provide any Chinese text, that would be a failure.`
   console.log('==================== USER PROMPT (END) ====================');
 
   try {
-    const response = await client.chat.completions.create(
-      {
-        model: MODEL,
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt,
-          },
-          { role: "user", content: prompt },
-        ],
-        temperature,
-        max_tokens: maxTokens,
-      },
-      {
-        timeout: 60000, // 60 second timeout
-      }
-    );
+    const response = await client.chat.completions.create({
+      model: MODEL,
+      messages: [
+        {
+          role: "system",
+          content: systemPrompt,
+        },
+        { role: "user", content: prompt },
+      ],
+      temperature,
+      max_tokens: maxTokens,
+    });
 
     // 获取文本内容
     const content = response.choices[0]?.message?.content?.trim() || "";
