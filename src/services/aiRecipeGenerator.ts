@@ -72,10 +72,17 @@ export async function generateRecipe(
 1. 标题简洁有吸引力（8-15 字）
 2. 食材用量精确（如"200g"、"2 瓣"、"适量"）
 3. 步骤清晰（每步 1-2 句话）
-4. 营养数据基于标准食材库估算
-5. 符合用户的菜系风格和难度要求
-6. 必须同时提供中英文内容
-7. **单位必须用中文：克、毫升、个、瓣、勺、适量等**
+4. **steps 字段严格要求：**
+   - stepNumber: 步骤编号（数字，从 1 开始）
+   - titleZh: 步骤标题（中文，可选，如"准备食材"）
+   - titleEn: 步骤标题（英文，可选，如"Prepare Ingredients"）
+   - contentZh: 步骤内容（中文，**必需**，详细描述操作）
+   - contentEn: 步骤内容（英文，**必需**，详细描述操作）
+   - durationMin: 该步骤时长（分钟，可选）
+5. 营养数据基于标准食材库估算
+6. 符合用户的菜系风格和难度要求
+7. 必须同时提供中英文内容
+8. **单位必须用中文：克、毫升、个、瓣、勺、适量等**
 
 返回 JSON 格式（严格按以下结构）：
 \`\`\`json
@@ -92,8 +99,25 @@ export async function generateRecipe(
     { "nameZh": "鸡胸肉", "nameEn": "Chicken Breast", "amount": "200", "unit": "克" },
     { "nameZh": "西兰花", "nameEn": "Broccoli", "amount": "150", "unit": "克" }
   ],
-  "steps": [...],
-  "nutrition": {...}
+  "steps": [
+    {
+      "stepNumber": 1,
+      "titleZh": "准备食材",
+      "titleEn": "Prepare Ingredients",
+      "contentZh": "将鸡胸肉切成小块，西兰花切成小朵，大蒜切末",
+      "contentEn": "Cut chicken breast into small pieces, broccoli into florets, mince garlic",
+      "durationMin": 5
+    },
+    {
+      "stepNumber": 2,
+      "titleZh": "炒制",
+      "titleEn": "Stir-fry",
+      "contentZh": "热锅下油，爆香蒜末，加入鸡肉翻炒至变色，加入西兰花继续翻炒",
+      "contentEn": "Heat oil in pan, sauté garlic until fragrant, add chicken and stir-fry until color changes, add broccoli and continue",
+      "durationMin": 10
+    }
+  ],
+  "nutrition": { "calories": 350, "protein": 40, "fat": 12, "carbs": 20 }
 }
 \`\`\`
 
@@ -104,10 +128,17 @@ Requirements:
 1. Concise and attractive title (8-15 words)
 2. Precise ingredient amounts (e.g., "200g", "2 cloves", "to taste")
 3. Clear steps (1-2 sentences per step)
-4. Nutrition data estimated from standard ingredient database
-5. Match user's cuisine style and difficulty requirements
-6. Must provide both Chinese and English content
-7. **Units must be in English: g, ml, pieces, cloves, tbsp, to taste, etc.**
+4. **steps field strict requirements:**
+   - stepNumber: step number (numeric, starting from 1)
+   - titleZh: step title (Chinese, optional, e.g., "准备食材")
+   - titleEn: step title (English, optional, e.g., "Prepare Ingredients")
+   - contentZh: step content (Chinese, **required**, detailed operation description)
+   - contentEn: step content (English, **required**, detailed operation description)
+   - durationMin: duration for this step (minutes, optional)
+5. Nutrition data estimated from standard ingredient database
+6. Match user's cuisine style and difficulty requirements
+7. Must provide both Chinese and English content
+8. **Units must be in English: g, ml, pieces, cloves, tbsp, to taste, etc.**
 
 Return JSON format (strictly follow this structure):
 \`\`\`json
@@ -124,8 +155,25 @@ Return JSON format (strictly follow this structure):
     { "nameZh": "鸡胸肉", "nameEn": "Chicken Breast", "amount": "200", "unit": "g" },
     { "nameZh": "西兰花", "nameEn": "Broccoli", "amount": "150", "unit": "g" }
   ],
-  "steps": [...],
-  "nutrition": {...}
+  "steps": [
+    {
+      "stepNumber": 1,
+      "titleZh": "准备食材",
+      "titleEn": "Prepare Ingredients",
+      "contentZh": "将鸡胸肉切成小块，西兰花切成小朵，大蒜切末",
+      "contentEn": "Cut chicken breast into small pieces, broccoli into florets, mince garlic",
+      "durationMin": 5
+    },
+    {
+      "stepNumber": 2,
+      "titleZh": "炒制",
+      "titleEn": "Stir-fry",
+      "contentZh": "热锅下油，爆香蒜末，加入鸡肉翻炒至变色，加入西兰花继续翻炒",
+      "contentEn": "Heat oil in pan, sauté garlic until fragrant, add chicken and stir-fry until color changes, add broccoli and continue",
+      "durationMin": 10
+    }
+  ],
+  "nutrition": { "calories": 350, "protein": 40, "fat": 12, "carbs": 20 }
 }
 \`\`\`
 
