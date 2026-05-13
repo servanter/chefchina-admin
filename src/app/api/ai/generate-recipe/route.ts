@@ -25,6 +25,7 @@ const GenerateRecipeSchema = z.object({
   cookTime: z.number().int().min(5).max(300).optional(),
   servings: z.number().int().min(1).max(20).optional(),
   dietaryRestrictions: z.array(z.string()).optional(),
+  language: z.enum(["zh", "en"]).optional().default("zh"),
 });
 
 // POST /api/ai/generate-recipe
@@ -57,7 +58,10 @@ export async function POST(req: NextRequest) {
     console.log("[AI Generate] Starting generation for user:", userId);
     console.log("[AI Generate] Input:", input);
 
-    const generatedRecipe = await generateRecipe(input as GeneratorInput);
+    const generatedRecipe = await generateRecipe({
+      ...input,
+      language: input.language,
+    } as GeneratorInput);
 
     console.log("[AI Generate] Generation successful");
 

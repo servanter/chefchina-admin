@@ -13,6 +13,7 @@ export interface GeneratorInput {
   cookTime?: number; // 期望烹饪时长（分钟）
   servings?: number; // 几人份（默认 2）
   dietaryRestrictions?: string[]; // ["低钠", "无糖", "素食"]
+  language?: "zh" | "en"; // 语言参数，默认中文
 }
 
 /**
@@ -60,8 +61,12 @@ export interface GeneratedRecipe {
 export async function generateRecipe(
   input: GeneratorInput
 ): Promise<GeneratedRecipe> {
-  // 构建 System Prompt
-  const systemPrompt = `你是专业厨师和营养师。根据用户提供的食材，生成一道完整的菜谱。
+  const lang = input.language || "zh"; // 默认中文
+  const isZh = lang === "zh";
+  
+  // 根据语言动态生成 System Prompt
+  const systemPrompt = isZh
+    ? `你是专业厨师和营养师。根据用户提供的食材，生成一道完整的菜谱。
 
 要求：
 1. 标题简洁有吸引力（8-15 字）
@@ -70,61 +75,65 @@ export async function generateRecipe(
 4. 营养数据基于标准食材库估算
 5. 符合用户的菜系风格和难度要求
 6. 必须同时提供中英文内容
+7. **单位必须用中文：克、毫升、个、瓣、勺、适量等**
 
 返回 JSON 格式（严格按以下结构）：
 \`\`\`json
 {
   "titleZh": "蒜香西兰花鸡胸",
   "titleEn": "Garlic Broccoli Chicken",
-  "descriptionZh": "简单快手,营养均衡,适合健身减脂人群。鸡胸肉嫩滑多汁,西兰花清脆爽口。",
-  "descriptionEn": "Simple, nutritious, and perfect for fitness enthusiasts. Tender chicken with crispy broccoli.",
+  "descriptionZh": "简单快手,营养均衡",
+  "descriptionEn": "Simple and nutritious",
+  "difficulty": "EASY",
+  "prepTime": 10,
+  "cookTimeMin": 15,
+  "servings": 2,
+  "ingredients": [
+    { "nameZh": "鸡胸肉", "nameEn": "Chicken Breast", "amount": "200", "unit": "克" },
+    { "nameZh": "西兰花", "nameEn": "Broccoli", "amount": "150", "unit": "克" }
+  ],
+  "steps": [...],
+  "nutrition": {...}
+}
+\`\`\`
+
+重要：只返回 JSON，不要有其他文字。`
+    : `You are a professional chef and nutritionist. Generate a complete recipe based on the ingredients provided by the user.
+
+Requirements:
+1. Concise and attractive title (8-15 words)
+2. Precise ingredient amounts (e.g., "200g", "2 cloves", "to taste")
+3. Clear steps (1-2 sentences per step)
+4. Nutrition data estimated from standard ingredient database
+5. Match user's cuisine style and difficulty requirements
+6. Must provide both Chinese and English content
+7. **Units must be in English: g, ml, pieces, cloves, tbsp, to taste, etc.**
+
+Return JSON format (strictly follow this structure):
+\`\`\`json
+{
+  "titleZh": "蒜香西兰花鸡胸",
+  "titleEn": "Garlic Broccoli Chicken",
+  "descriptionZh": "简单快手,营养均衡",
+  "descriptionEn": "Simple and nutritious",
   "difficulty": "EASY",
   "prepTime": 10,
   "cookTimeMin": 15,
   "servings": 2,
   "ingredients": [
     { "nameZh": "鸡胸肉", "nameEn": "Chicken Breast", "amount": "200", "unit": "g" },
-    { "nameZh": "西兰花", "nameEn": "Broccoli", "amount": "150", "unit": "g" },
-    { "nameZh": "蒜", "nameEn": "Garlic", "amount": "3", "unit": "瓣" },
-    { "nameZh": "橄榄油", "nameEn": "Olive Oil", "amount": "1", "unit": "tbsp" },
-    { "nameZh": "盐", "nameEn": "Salt", "amount": "适量", "unit": "" },
-    { "nameZh": "黑胡椒", "nameEn": "Black Pepper", "amount": "适量", "unit": "", "isOptional": true }
+    { "nameZh": "西兰花", "nameEn": "Broccoli", "amount": "150", "unit": "g" }
   ],
-  "steps": [
-    {
-      "stepNumber": 1,
-      "titleZh": "准备食材",
-      "titleEn": "Prepare Ingredients",
-      "contentZh": "鸡胸肉切成小块,用盐和黑胡椒腌制5分钟。西兰花切小朵,蒜切片。",
-      "contentEn": "Cut chicken into cubes and marinate with salt and pepper for 5 min. Cut broccoli into florets and slice garlic.",
-      "durationMin": 5
-    },
-    {
-      "stepNumber": 2,
-      "titleZh": "焯水西兰花",
-      "titleEn": "Blanch Broccoli",
-      "contentZh": "煮沸一锅水,加少许盐,放入西兰花焯水1分钟,捞出沥干。",
-      "contentEn": "Bring water to boil, add salt, blanch broccoli for 1 min, drain.",
-      "durationMin": 2
-    }
-  ],
-  "nutrition": {
-    "calories": 280,
-    "protein": 35,
-    "fat": 8,
-    "carbs": 12,
-    "fiber": 4,
-    "sodium": 180,
-    "sugar": 2
-  },
-  "tags": ["低脂", "高蛋白", "快手菜", "减脂餐"]
+  "steps": [...],
+  "nutrition": {...}
 }
 \`\`\`
 
-重要：只返回 JSON，不要有其他文字。`;
+Important: Return JSON only, no other text.`;
 
-  // 构建 User Prompt
-  const userPrompt = `请根据以下食材生成一道菜谱：
+  // 根据语言动态生成 User Prompt
+  const userPrompt = isZh
+    ? `请根据以下食材生成一道菜谱：
 
 ## 输入食材
 ${input.ingredients.join("、")}
@@ -136,7 +145,20 @@ ${input.ingredients.join("、")}
 - 人份: ${input.servings || 2} 人份
 ${input.dietaryRestrictions?.length ? `- 饮食限制: ${input.dietaryRestrictions.join("、")}` : ""}
 
-请生成 JSON 格式的菜谱。`;
+请生成 JSON 格式的菜谱。**单位必须用中文（克、毫升、个等）。**`
+    : `Please generate a recipe based on the following ingredients:
+
+## Input Ingredients
+${input.ingredients.join(", ")}
+
+## Requirements
+- Cuisine Style: ${input.style || "Any"}
+- Difficulty: ${input.difficulty || "Medium"}
+- Cook Time: ${input.cookTime ? `About ${input.cookTime} minutes` : "Any"}
+- Servings: ${input.servings || 2} servings
+${input.dietaryRestrictions?.length ? `- Dietary Restrictions: ${input.dietaryRestrictions.join(", ")}` : ""}
+
+Please generate a recipe in JSON format. **Units must be in English (g, ml, pieces, etc.).**`;
 
   // 打印完整 Prompt（调试用）
   console.log("==================== SYSTEM PROMPT (START) ====================");
@@ -152,8 +174,8 @@ ${input.dietaryRestrictions?.length ? `- 饮食限制: ${input.dietaryRestrictio
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const response = await callLLM(userPrompt, {
-        systemPrompt,  // ✅ FIX: 传入自定义的 systemPrompt
-        temperature: 0.8, // 提高创意性
+        systemPrompt,  // 使用自定义 systemPrompt
+        temperature: 0.8,
         maxTokens: 4096,
       });
 
@@ -161,10 +183,9 @@ ${input.dietaryRestrictions?.length ? `- 饮食限制: ${input.dietaryRestrictio
       console.log(JSON.stringify(response, null, 2));
       console.log("==================== LLM RESPONSE (END) ====================");
 
-      // callLLM 已经返回了解析后的 JSON 对象
       parsed = response as GeneratedRecipe;
 
-      // 补充默认值（如果 LLM 缺少某些字段）
+      // 补充默认值
       if (!parsed.cookTimeMin) parsed.cookTimeMin = 30;
       if (!parsed.servings) parsed.servings = input.servings || 2;
       if (!parsed.difficulty) parsed.difficulty = input.difficulty || "MEDIUM";
