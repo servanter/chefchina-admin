@@ -152,6 +152,7 @@ ${input.dietaryRestrictions?.length ? `- 饮食限制: ${input.dietaryRestrictio
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       const response = await callLLM(userPrompt, {
+        systemPrompt,  // ✅ FIX: 传入自定义的 systemPrompt
         temperature: 0.8, // 提高创意性
         maxTokens: 4096,
       });

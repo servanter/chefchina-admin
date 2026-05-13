@@ -19,23 +19,31 @@ function getClient() {
 /**
  * 调用 LLM
  * @param prompt 提示词
- * @param temperature 温度(0-1,默认 0.7)
- * @param maxTokens 最大 token 数(默认 4096)
- * @param language 语言('zh' | 'en',默认 'zh')
+ * @param options.systemPrompt 自定义系统提示词（如果不提供，根据 language 使用默认）
+ * @param options.temperature 温度(0-1,默认 0.7)
+ * @param options.maxTokens 最大 token 数(默认 4096)
+ * @param options.language 语言('zh' | 'en',默认 'zh')，仅在未提供 systemPrompt 时有效
  * @returns 解析后的 JSON 对象
  */
 export async function callLLM(
   prompt: string,
   options: {
+    systemPrompt?: string;  // ✅ NEW: 支持传入自定义 systemPrompt
     temperature?: number;
     maxTokens?: number;
     language?: 'zh' | 'en';
   } = {}
 ): Promise<any> {
-  const { temperature = 0.7, maxTokens = 4096, language = 'zh' } = options;
+  const { 
+    systemPrompt: customSystemPrompt,
+    temperature = 0.7, 
+    maxTokens = 4096, 
+    language = 'zh' 
+  } = options;
   
   // ✅ 添加详细日志
   console.log('[LLM] callLLM params:', { 
+    hasCustomSystemPrompt: !!customSystemPrompt,
     language, 
     temperature,
     maxTokens,
@@ -44,9 +52,10 @@ export async function callLLM(
   
   const client = getClient();
 
-  // ✅ FIX: 根据语言选择系统提示词 + 强化语言指令
-  const systemPrompt = language === 'en'
-    ? `You are a professional nutritionist specializing in recipe nutrition analysis and personalized recommendations.
+  // ✅ FIX: 如果提供了自定义 systemPrompt，直接使用；否则根据 language 选择默认
+  const systemPrompt = customSystemPrompt || (
+    language === 'en'
+      ? `You are a professional nutritionist specializing in recipe nutrition analysis and personalized recommendations.
 
 CRITICAL REQUIREMENT: You MUST respond in English language only.
 Do NOT use any Chinese characters in your response.
@@ -54,12 +63,13 @@ All analysis, explanations, and recommendations MUST be written in English.
 Return results strictly in the required JSON format.
 
 If you provide any Chinese text, that would be a failure.`
-    : `你是一位专业的营养师,擅长分析菜谱营养价值并提供个性化建议。
+      : `你是一位专业的营养师,擅长分析菜谱营养价值并提供个性化建议。
 
 重要要求：你必须只用中文回答。
 不要使用任何英文字符（除了专业术语）。
 所有分析、解释和建议都必须用中文书写。
-请严格按照要求的 JSON 格式返回结果。`;
+请严格按照要求的 JSON 格式返回结果。`
+  );
 
   // ✅ 打印完整的 System Prompt
   console.log('==================== SYSTEM PROMPT (START) ====================');
