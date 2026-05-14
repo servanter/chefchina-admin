@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleError } from '@/lib/api'
 import { createNotification, hasRecentNotification, DAY_MS } from '@/lib/notifications'
 import { addUserExp } from '@/lib/exp'  // REQ-12.9
-import { requireAuth } from '@/lib/auth-guard'
+import { requireAuth, extractAuth } from '@/lib/auth-guard'
 import { invalidateCache } from '@/lib/redis'
 
 // POST /api/likes/[recipeId]  — toggle like
@@ -86,14 +86,16 @@ export async function POST(
   }
 }
 
-// GET /api/likes/[recipeId]?userId=xxx
+// GET /api/likes/[recipeId]
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ recipeId: string }> }
 ) {
   try {
     const { recipeId } = await params
-    const userId = new URL(req.url).searchParams.get('userId')
+    // 从 JWT token 获取 userId（可选）
+    const auth = extractAuth(req)
+    const userId = auth?.sub
 
     const [count, liked] = await Promise.all([
       prisma.like.count({ where: { recipeId } }),

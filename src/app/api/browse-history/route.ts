@@ -1,15 +1,21 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, handleError } from '@/lib/api'
+import { requireAuth, extractAuth } from '@/lib/auth-guard'
 
 // POST /api/browse-history - 记录浏览历史
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { userId, recipeId } = await request.json()
+    // 鉴权：从 JWT token 获取 userId
+    const auth = requireAuth(request)
+    if (auth instanceof Response) return auth
+    const userId = auth.sub
 
-    if (!userId || !recipeId) {
+    const { recipeId } = await request.json()
+
+    if (!recipeId) {
       return NextResponse.json(
-        { success: false, error: 'userId and recipeId are required' },
+        { success: false, error: 'recipeId is required' },
         { status: 400 }
       )
     }
@@ -38,18 +44,15 @@ export async function POST(request: Request) {
 }
 
 // GET /api/browse-history - 获取用户浏览历史
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
-    const limit = parseInt(searchParams.get('limit') || '50')
+    // 鉴权：从 JWT token 获取 userId
+    const auth = requireAuth(request)
+    if (auth instanceof Response) return auth
+    const userId = auth.sub
 
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: 'userId is required' },
-        { status: 400 }
-      )
-    }
+    const { searchParams } = new URL(request.url)
+    const limit = parseInt(searchParams.get('limit') || '50')
 
     const history = await prisma.browseHistory.findMany({
       where: { userId },

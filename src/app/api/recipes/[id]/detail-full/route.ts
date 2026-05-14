@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleError } from '@/lib/api'
 import { withCache, CACHE_TTL } from '@/lib/redis'
+import { extractAuth } from '@/lib/auth-guard'
 
 /**
  * GET /api/recipes/:id/detail-full
@@ -23,17 +24,10 @@ export async function GET(
 ) {
   try {
     const { id } = await params
-    const { searchParams } = new URL(req.url)
-    // userId 从 Authorization header 中获取，不从 URL 中传递
-    const authHeader = req.headers.get('authorization')
-    let userId: string | null = null
-    if (authHeader?.startsWith('Bearer ')) {
-      // 这里简化处理，实际应该验证 JWT token
-      // 但为了快速修复，先保留 URL 参数兼容
-      userId = searchParams.get('userId')
-    } else {
-      userId = searchParams.get('userId')
-    }
+    
+    // 从 JWT token 获取 userId（可选）
+    const auth = extractAuth(req)
+    const userId = auth?.sub
 
     // 缓存 2 分钟（匿名用户可共享缓存）
     const cacheKey = userId ? `recipe:detail-full:${id}:${userId}` : `recipe:detail-full:${id}`

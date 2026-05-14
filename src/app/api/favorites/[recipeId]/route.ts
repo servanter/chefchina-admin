@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleError } from '@/lib/api'
 import { createNotification, hasRecentNotification, DAY_MS } from '@/lib/notifications'
 import { addUserExp } from '@/lib/exp'  // REQ-12.9
-import { requireAuth } from '@/lib/auth-guard'
+import { requireAuth, extractAuth } from '@/lib/auth-guard'
 import { invalidateCache } from '@/lib/redis'
 import { checkFavoritesLimit } from '@/lib/permissions'
 
@@ -93,15 +93,21 @@ export async function POST(
   }
 }
 
-// GET /api/favorites/[recipeId]?userId=xxx
+// GET /api/favorites/[recipeId]
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ recipeId: string }> }
 ) {
   try {
+    // 鉴权：从 JWT token 获取 userId（可选）
     const { recipeId } = await params
-    const userId = new URL(req.url).searchParams.get('userId')
-    if (!userId) return errorResponse('userId is required', 400)
+    const auth = extractAuth(req)
+    const userId = auth?.sub
+    
+    if (!userId) {
+      // 未登录用户返回 false
+      return successResponse({ favorited: false })
+    }
 
     const favorite = await prisma.favorite.findUnique({
       where: { userId_recipeId: { userId, recipeId } },

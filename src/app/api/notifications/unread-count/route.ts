@@ -3,21 +3,17 @@ import { prisma } from '@/lib/prisma'
 import { successResponse, errorResponse, handleError } from '@/lib/api'
 import { requireAuth, requireSelfOrAdmin } from '@/lib/auth-guard'
 
-// GET /api/notifications/unread-count?userId=xxx&type=all|like|comment|system
+// GET /api/notifications/unread-count?type=all|like|comment|system
 // REQ-16.2: 获取未读数量（按类型分组）
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
-    const type = searchParams.get('type') || 'all'
-
-    if (!userId) return errorResponse('userId is required', 400)
-
-    // 鉴权：必须登录，且 userId 必须是本人（或 ADMIN）
+    // 鉴权：从 JWT token 获取 userId
     const auth = requireAuth(req)
     if (auth instanceof Response) return auth
-    const guard = requireSelfOrAdmin(req, userId, auth)
-    if (guard instanceof Response) return guard
+    const userId = auth.sub
+
+    const { searchParams } = new URL(req.url)
+    const type = searchParams.get('type') || 'all'
 
     // 定义类型映射
     const typeMap: Record<string, string[]> = {

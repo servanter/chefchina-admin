@@ -15,24 +15,20 @@ const CreateSchema = z.object({
   payload: z.record(z.string(), z.any()).optional().nullable(),
 })
 
-// GET /api/notifications?userId=xxx&unreadOnly=true&tab=all|like|comment|system&page=1&pageSize=20
+// GET /api/notifications?unreadOnly=true&tab=all|like|comment|system&page=1&pageSize=20
 // REQ-16.2: 增加 tab 参数支持分类查询
 export async function GET(req: NextRequest) {
   try {
+    // 鉴权：从 JWT token 获取 userId
+    const auth = requireAuth(req)
+    if (auth instanceof Response) return auth
+    const userId = auth.sub
+
     const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId')
     const unreadOnly = searchParams.get('unreadOnly') === 'true'
     const tab = searchParams.get('tab') || 'all'
     const page = Number(searchParams.get('page') || 1)
     const pageSize = Number(searchParams.get('pageSize') || 20)
-
-    if (!userId) return errorResponse('userId is required', 400)
-
-    // 鉴权：必须登录，且 userId 必须是本人（或 ADMIN）
-    const auth = requireAuth(req)
-    if (auth instanceof Response) return auth
-    const guard = requireSelfOrAdmin(req, userId, auth)
-    if (guard instanceof Response) return guard
 
     // REQ-16.2: 定义类型映射
     const typeMap: Record<string, string[] | undefined> = {
