@@ -27,7 +27,7 @@ export async function GET(
     
     // 从 JWT token 获取 userId（可选）
     const auth = extractAuth(req)
-    const userId = auth?.sub}
+    const userId = auth?.sub
 
     // 缓存 2 分钟（匿名用户可共享缓存）
     const cacheKey = userId ? `recipe:detail-full:${id}:${userId}` : `recipe:detail-full:${id}`
