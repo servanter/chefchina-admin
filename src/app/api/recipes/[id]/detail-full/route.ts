@@ -29,10 +29,13 @@ export async function GET(
     const auth = extractAuth(req)
     const userId = auth?.sub
 
-    // 缓存 2 分钟（匿名用户可共享缓存）
-    const cacheKey = userId ? `recipe:detail-full:${id}:${userId}` : `recipe:detail-full:${id}`
+    // 暂时注释 Redis 缓存，让动态数据实时更新
+    // const cacheKey = userId ? `recipe:detail-full:${id}:${userId}` : `recipe:detail-full:${id}`
     
-    const data = await withCache(cacheKey, CACHE_TTL.recipe, async () => {
+    // const data = await withCache(cacheKey, CACHE_TTL.recipe, async () => {
+    
+    // 直接从数据库获取，不使用缓存
+    const data = await (async () => {
       // 1. 菜谱详情 + 作者信息 + ingredients + steps
       const recipe = await prisma.recipe.findUnique({
         where: { id },
@@ -233,7 +236,8 @@ export async function GET(
         userStatus,
         commentLikeStatus, // 新增：评论点赞状态
       }
-    })
+    })()
+    // })
 
     return successResponse(data)
   } catch (error: any) {
