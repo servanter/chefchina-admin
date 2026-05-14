@@ -111,6 +111,7 @@ export async function POST(req: NextRequest) {
     const data = {
       ...parsed,
       userId,
+      images: parsed.images ?? [],
       parentId: parsed.parentId ?? undefined,
       replyToUserId: parsed.replyToUserId ?? undefined,
     }
