@@ -1,20 +1,55 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, handleError, paginate } from '@/lib/api'
+import { extractAuth } from '@/lib/auth-guard'
 
 // GET /api/recommend - 个性化推荐
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
+    // 从 JWT token 获取 userId（可选）
+    const auth = extractAuth(request)
+    const userId = auth?.sub
+
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '20')
 
     if (!userId) {
-      return NextResponse.json(
-        { success: false, error: 'userId is required' },
-        { status: 400 }
-      )
+      // 匿名用户，返回全站热门
+      const start = (page - 1) * limit
+      const [hotRecipes, total] = await Promise.all([
+        prisma.recipe.findMany({
+          where: { isPublished: true },
+          include: {
+            author: {
+              select: { id: true, name: true, avatar: true, level: true }
+            },
+            category: {
+              select: { id: true, nameEn: true, nameZh: true }
+            },
+            _count: {
+              select: { likes: true, favorites: true, comments: true }
+            }
+          },
+          orderBy: [
+            { viewCount: 'desc' },
+            { createdAt: 'desc' }
+          ],
+          take: limit,
+          skip: start
+        }),
+        prisma.recipe.count({ where: { isPublished: true } })
+      ])
+
+      return NextResponse.json(successResponse({
+        recipes: hotRecipes.map(r => ({ ...r, reason: 'hot' })),
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
+      }))
     }
 
     // 1. 获取用户浏览历史（最近 30 条）

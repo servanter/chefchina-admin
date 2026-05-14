@@ -6,28 +6,13 @@ import { requireAuth, requireSelfOrAdmin } from '@/lib/auth-guard'
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const notif = (prisma as any).notification
 
-// POST /api/notifications/read-all?userId=xxx
+// POST /api/notifications/read-all
 export async function POST(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url)
-    let userId = searchParams.get('userId')
-
-    if (!userId) {
-      try {
-        const body = await req.json()
-        userId = body?.userId ?? null
-      } catch {
-        // no body — ok
-      }
-    }
-
-    if (!userId) return errorResponse('userId is required', 400)
-
-    // 鉴权
+    // 鉴权：从 JWT token 获取 userId
     const auth = requireAuth(req)
     if (auth instanceof Response) return auth
-    const guard = requireSelfOrAdmin(req, userId, auth)
-    if (guard instanceof Response) return guard
+    const userId = auth.sub
 
     const result = await notif.updateMany({
       where: { userId, readAt: null },

@@ -8,14 +8,7 @@ export async function GET(req: NextRequest) {
   try {
     const auth = requireAuth(req)
     if (auth instanceof Response) return auth
-
-    const userId = new URL(req.url).searchParams.get('userId')
-    if (!userId) return errorResponse('userId is required', 400)
-
-    // Only allow querying own favorites, unless ADMIN
-    if (auth.sub !== userId && auth.role !== 'ADMIN') {
-      return errorResponse('Forbidden', 403)
-    }
+    const userId = auth.sub
 
     const favorites = await prisma.favorite.findMany({
       where: { userId },

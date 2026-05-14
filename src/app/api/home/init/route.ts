@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { successResponse, handleError } from '@/lib/api'
 import { withCache, CACHE_TTL } from '@/lib/redis'
+import { extractAuth } from '@/lib/auth-guard'
 
 /**
  * GET /api/home/init
@@ -12,14 +13,16 @@ import { withCache, CACHE_TTL } from '@/lib/redis'
  * - /api/recipes?difficulty=easy&limit=6 (快手菜)
  * - /api/ranking?period=week (周热榜)
  * - /api/categories (分类列表)
- * - /api/notifications/unread-count (未读通知)
+ * - /api/notifications/unread-count (未读通知，需要登录）
  * 
  * 目的：减少首屏并发请求，加快加载速度，降低数据库连接压力
  */
 export async function GET(req: NextRequest) {
   try {
+    // 获取登录态（可选）
     const { searchParams } = new URL(req.url)
-    const userId = searchParams.get('userId') // 可选，用于查询未读通知
+    const auth = extractAuth(req)
+    const userId = auth?.sub
 
     // 匿名用户缓存 5 分钟，登录用户缓存 2 分钟
     const cacheKey = userId ? `home:init:${userId}` : 'home:init:guest'
