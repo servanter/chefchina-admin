@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const weekStartParam = searchParams.get('weekStart')
+    const lang = (searchParams.get('lang') === 'en' ? 'en' : 'zh') as 'zh' | 'en'
 
     // 计算周一和周日
     let weekStart: Date
@@ -106,14 +107,22 @@ export async function GET(req: NextRequest) {
           weekTotal,
           daysOnTarget,
           daysRecorded: Object.keys(dailyStats).length,
-        }
+        },
+        lang
       )
     } else if (!profile) {
-      aiAdviceResult = { content: '请先设置健康档案', source: 'rule' as const }
+      aiAdviceResult = {
+        content: lang === 'en'
+          ? 'Please set up your health profile first.'
+          : '请先设置健康档案',
+        source: 'rule' as const,
+      }
     } else {
       // 免费用户给予升级提示
       aiAdviceResult = {
-        content: '订阅 Premium 套餐即可获得 AI 营养师的个性化建议，帮助你更好地达成健康目标！',
+        content: lang === 'en'
+          ? 'Subscribe to Premium to get personalized AI nutritionist advice and better reach your health goals!'
+          : '订阅 Premium 套餐即可获得 AI 营养师的个性化建议，帮助你更好地达成健康目标！',
         source: 'rule' as const,
         premiumRequired: true,
       }
