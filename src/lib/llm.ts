@@ -28,17 +28,19 @@ function getClient() {
 export async function callLLM(
   prompt: string,
   options: {
-    systemPrompt?: string;  // ✅ NEW: 支持传入自定义 systemPrompt
+    systemPrompt?: string;  // 支持传入自定义 systemPrompt
     temperature?: number;
     maxTokens?: number;
     language?: 'zh' | 'en';
+    rawText?: boolean;       // 为 true 时直接返回纯文本，不解析 JSON
   } = {}
 ): Promise<any> {
   const { 
     systemPrompt: customSystemPrompt,
     temperature = 0.7, 
     maxTokens = 4096, 
-    language = 'zh' 
+    language = 'zh',
+    rawText = false,
   } = options;
   
   // ✅ 添加详细日志
@@ -98,10 +100,15 @@ If you provide any Chinese text, that would be a failure.`
     // 获取文本内容
     const content = response.choices[0]?.message?.content?.trim() || "";
     
-    // ✅ 打印完整的 LLM 响应
+    // 打印完整的 LLM 响应
     console.log('==================== LLM RESPONSE (START) ====================');
     console.log(content);
     console.log('==================== LLM RESPONSE (END) ====================');
+
+    // rawText 模式直接返回纯文本，不解析 JSON
+    if (rawText) {
+      return content;
+    }
 
     // 解析 JSON(LLM 可能包裹在 ```json ... ``` 中)
     return parseAIResponse(content);

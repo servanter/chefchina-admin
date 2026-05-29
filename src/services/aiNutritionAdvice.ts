@@ -3,7 +3,7 @@
  * 使用阿里云 DeepSeek V4 Flash 大模型
  */
 
-import OpenAI from 'openai'
+import { callLLM } from '@/lib/llm'
 
 export interface NutritionProfile {
   goal: string
@@ -24,78 +24,31 @@ export interface WeeklyData {
   daysRecorded: number
 }
 
-// 阿里云 DeepSeek 配置
-const client = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY || 'sk-your-deepseek-api-key',
-  baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-})
-
-const MODEL = 'deepseek-v4-flash'
-
-export interface NutritionProfile {
-  goal: string
-  dailyCalories: number
-  proteinPercent: number
-  fatPercent: number
-  carbsPercent: number
-}
-
-export interface WeeklyData {
-  weekTotal: {
-    calories: number
-    protein: number
-    fat: number
-    carbs: number
-  }
-  daysOnTarget: number
-  daysRecorded: number
-}
+const NUTRITION_SYSTEM_PROMPT = '你是一位专业的营养师，擅长根据用户的饮食数据提供个性化的营养建议。请用简洁、友好的语气回答，不超过3句话。'
 
 /**
- * 调用阿里云 DeepSeek 生成建议
+ * 调用 LLM 生成营养建议（复用 llm.ts 统一封装）
+ * llm.ts 的 callLLM 默认解析 JSON，这里需要纯文本，
+ * 所以捕获 AI_INVALID_RESPONSE 错误后直接取原始文本
  */
 async function callAI(prompt: string): Promise<{ content: string; source: 'ai' | 'rule' }> {
   try {
-    const messages: Array<{ role: 'system' | 'user'; content: string }> = [
-      {
-        role: 'system',
-        content: '你是一位专业的营养师，擅长根据用户的饮食数据提供个性化的营养建议。请用简洁、友好的语气回答，不超过3句话。',
-      },
-      {
-        role: 'user',
-        content: prompt,
-      },
-    ]
-
-    // 打印完整的 prompt（所有环境）
-    console.log('\n========== AI Prompt ==========\n')
-    console.log('Model:', MODEL)
-    console.log('\nMessages:')
-    messages.forEach((msg, idx) => {
-      console.log(`\n[${idx + 1}] Role: ${msg.role}`)
-      console.log('Content:')
-      console.log(msg.content)
-      console.log('---')
-    })
-    console.log('\n==============================\n')
-
-    const response = await client.chat.completions.create({
-      model: MODEL,
-      messages,
+    // callLLM 会尝试解析 JSON，营养建议是纯文本会抛出 AI_INVALID_RESPONSE
+    // 通过在 systemPrompt 中要求返回纯文本来避免这个问题
+    const content: string = await callLLM(prompt, {
+      systemPrompt: NUTRITION_SYSTEM_PROMPT,
       temperature: 0.7,
-      max_tokens: 200,
+      maxTokens: 200,
+      rawText: true,  // 营养建议是纯文本，不需要解析 JSON
     })
-
-    return {
-      content: response.choices[0]?.message?.content?.trim() || '暂无建议',
-      source: 'ai'
-    }
-  } catch (error) {
-    console.error('AI 调用失败:', error)
-    // 使用提示词中的数据生成规则建议
+    return { content: content || '暂无建议', source: 'ai' }
+  } catch (error: unknown) {
+    // 其他错误（限流、服务异常）降级到规则建议
+    const msg = error instanceof Error ? error.message : String(error)
+    console.error('AI 调用失败:', msg)
     return {
       content: generateRuleBasedAdvice(prompt),
-      source: 'rule'
+      source: 'rule',
     }
   }
 }
@@ -198,114 +151,6 @@ export async function generateWeeklyAdvice(
 - 达标天数：${daysOnTarget} / ${daysRecorded}
 
 请根据以上数据，给出简洁的营养建议（2-3句话），帮助用户改进饮食。
-`
-
-  return await callAI(prompt)
-}
-
-/**
- * 生成每日饮食建议
- */
-export async function generateDailyAdvice(
-  profile: NutritionProfile,
-  currentIntake: {
-    calories: number
-    protein: number
-    fat: number
-    carbs: number
-  }
-): Promise<{ content: string; source: 'ai' | 'rule' }> {
-  const { goal, dailyCalories, proteinPercent } = profile
-  const { calories, protein, fat, carbs } = currentIntake
-
-  const remaining = dailyCalories - calories
-  const targetProtein = Math.round((dailyCalories * proteinPercent / 100) / 4) // 1g 蛋白质 = 4 kcal
-  const proteinRemaining = targetProtein - protein
-
-  const goalMap: Record<string, string> = {
-    weight_loss: '减脂',
-    muscle_gain: '增肌',
-    maintain: '保持体重',
-  }
-  const goalText = goalMap[goal] || '健康饮食'
-
-  const prompt = `
-用户健康目标：${goalText}
-每日目标热量：${dailyCalories} 千卡
-
-今日已摄入：
-- 热量：${calories} 千卡（剩余 ${remaining} 千卡）
-- 蛋白质：${protein}g（目标 ${targetProtein}g，剩余 ${proteinRemaining}g）
-- 脂肪：${fat}g
-- 碳水：${carbs}g
-
-请简短建议用户接下来的饮食安排（1-2句话）。
-`
-
-  return await callAI(prompt)
-}
-
-/**
- * 菜谱推荐理由
- */
-export async function generateRecipeRecommendation(
-  profile: NutritionProfile,
-  recipe: {
-    name?: string
-    calories: number
-    protein: number
-    fat: number
-    carbs: number
-  }
-): Promise<{ content: string; source: 'ai' | 'rule' }> {
-  const { goal, dailyCalories } = profile
-
-  const goalMap: Record<string, string> = {
-    weight_loss: '减脂',
-    muscle_gain: '增肌',
-    maintain: '保持体重',
-  }
-  const goalText = goalMap[goal] || '健康饮食'
-
-  const prompt = `
-用户健康目标：${goalText}
-每日目标热量：${dailyCalories} 千卡
-
-这道菜谱${recipe.name ? `"${recipe.name}"` : ''}的营养成分：
-- 热量：${recipe.calories} 千卡
-- 蛋白质：${recipe.protein}g
-- 脂肪：${recipe.fat}g
-- 碳水：${recipe.carbs}g
-
-请用一句话（15字以内）说明这道菜是否适合用户的健康目标。格式如："✅ 低热量高蛋白，适合减脂" 或 "⚠️ 热量较高，建议适量"
-`
-
-  return await callAI(prompt)
-}
-
-/**
- * 生成营养分析（用于菜谱详情页）
- */
-export async function analyzeRecipeNutrition(recipe: {
-  name: string
-  calories: number
-  protein: number
-  fat: number
-  carbs: number
-  fiber?: number
-  sodium?: number
-}): Promise<{ content: string; source: 'ai' | 'rule' }> {
-  const prompt = `
-菜谱名称：${recipe.name}
-营养成分（每份）：
-- 热量：${recipe.calories} 千卡
-- 蛋白质：${recipe.protein}g
-- 脂肪：${recipe.fat}g
-- 碳水化合物：${recipe.carbs}g
-${recipe.fiber ? `- 膳食纤维：${recipe.fiber}g` : ''}
-${recipe.sodium ? `- 钠：${recipe.sodium}mg` : ''}
-
-请用2-3句话分析这道菜的营养特点，并说明适合什么人群。语气要友好专业。
 `
 
   return await callAI(prompt)
