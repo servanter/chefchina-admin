@@ -9,7 +9,7 @@ const notif = (prisma as any).notification
 
 const CreateSchema = z.object({
   userId: z.string(),
-  type: z.enum(['COMMENT_REPLY', 'RECIPE_LIKED', 'RECIPE_FAVORITED', 'SUBMISSION_APPROVED', 'SYSTEM']),
+  type: z.enum(['COMMENT_REPLY', 'RECIPE_LIKED', 'RECIPE_FAVORITED', 'SUBMISSION_APPROVED', 'SYSTEM', 'NEW_FOLLOWER']),
   title: z.string().min(1).max(200),
   body: z.string().min(1).max(1000),
   payload: z.record(z.string(), z.any()).optional().nullable(),
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       all: undefined, // undefined 表示所有类型
       like: ['RECIPE_LIKED', 'RECIPE_FAVORITED'],
       comment: ['COMMENT_REPLY'],
-      system: ['SUBMISSION_APPROVED', 'SYSTEM'],
+      system: ['SUBMISSION_APPROVED', 'SYSTEM', 'NEW_FOLLOWER'],
     }
 
     const types = typeMap[tab]

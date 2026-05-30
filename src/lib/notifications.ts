@@ -6,6 +6,7 @@ export type NotificationType =
   | 'RECIPE_FAVORITED'
   | 'SUBMISSION_APPROVED'
   | 'SYSTEM'
+  | 'NEW_FOLLOWER'
 
 interface CreateNotificationParams {
   userId: string
