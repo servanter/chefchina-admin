@@ -1,7 +1,8 @@
 import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { successResponse, handleError } from '@/lib/api'
+import { successResponse, errorResponse, handleError } from '@/lib/api'
 import { withCache, CACHE_TTL } from '@/lib/redis'
+import { requireAuth } from '@/lib/auth-guard'
 
 /**
  * GET /api/admin/stats
@@ -10,10 +11,9 @@ import { withCache, CACHE_TTL } from '@/lib/redis'
  */
 export async function GET(req: NextRequest) {
   try {
-    // TODO: 添加 admin 角色验证
-    // const auth = requireAuth(req)
-    // if (auth instanceof Response) return auth
-    // if (auth.role !== 'ADMIN') return errorResponse('Forbidden', 403)
+    const auth = requireAuth(req)
+    if (auth instanceof Response) return auth
+    if (auth.role !== 'ADMIN') return errorResponse('Forbidden', 403)
 
     const stats = await withCache('admin:stats', 60 * 5, async () => {
       const now = new Date()
