@@ -7,12 +7,12 @@ import { api } from '@/lib/api-client'
 interface Category {
   id: string
   nameZh: string
-  nameEn: string
+  name: string
   slug: string
-  image?: string | null
-  sortOrder: number
-  createdAt: string
-  _count: { recipes: number }
+  icon?: string | null
+  sortOrder?: number
+  createdAt?: string
+  recipeCount: number
 }
 
 interface CategoryForm {
@@ -78,7 +78,7 @@ export default function CategoriesPage() {
     try {
       const res = await api.get('/api/categories')
       const d = await res.json()
-      setCategories(d?.data ?? [])
+      setCategories(d?.data?.data ?? [])
     } catch {
       setCategories([])
     } finally {
@@ -110,10 +110,10 @@ export default function CategoriesPage() {
   function openEdit(cat: Category) {
     setForm({
       nameZh: cat.nameZh,
-      nameEn: cat.nameEn,
+      nameEn: cat.name,
       slug: cat.slug,
-      sortOrder: cat.sortOrder,
-      image: cat.image ?? '',
+      sortOrder: cat.sortOrder ?? 0,
+      image: cat.icon ?? '',
     })
     setFormError(null)
     setEditingId(cat.id) // string = editing
@@ -245,9 +245,9 @@ export default function CategoriesPage() {
                     {/* Image */}
                     <td className="px-5 py-3.5">
                       <div className="w-10 h-10 rounded-lg overflow-hidden bg-orange-50 flex items-center justify-center">
-                        {cat.image ? (
+                        {cat.icon ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={cat.image} alt={cat.nameZh} className="w-full h-full object-cover" />
+                          <img src={cat.icon} alt={cat.nameZh} className="w-full h-full object-cover" />
                         ) : (
                           <span className="text-orange-400 text-lg">🏷</span>
                         )}
@@ -256,7 +256,7 @@ export default function CategoriesPage() {
                     {/* Name */}
                     <td className="px-5 py-3.5">
                       <p className="font-medium text-gray-900">{cat.nameZh}</p>
-                      <p className="text-xs text-gray-400">{cat.nameEn}</p>
+                      <p className="text-xs text-gray-400">{cat.name}</p>
                     </td>
                     {/* Slug */}
                     <td className="px-5 py-3.5">
@@ -267,7 +267,7 @@ export default function CategoriesPage() {
                     {/* Recipe count */}
                     <td className="px-5 py-3.5">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
-                        {cat._count?.recipes ?? 0} 道
+                        {cat.recipeCount ?? 0} 道
                       </span>
                     </td>
                     {/* Sort */}
@@ -276,7 +276,7 @@ export default function CategoriesPage() {
                     </td>
                     {/* Date */}
                     <td className="px-5 py-3.5 text-xs text-gray-400 whitespace-nowrap">
-                      {new Date(cat.createdAt).toLocaleDateString('zh-CN')}
+                      {cat.createdAt ? new Date(cat.createdAt).toLocaleDateString('zh-CN') : '—'}
                     </td>
                     {/* Actions */}
                     <td className="px-5 py-3.5">
@@ -294,8 +294,8 @@ export default function CategoriesPage() {
                         {/* Delete button */}
                         <button
                           onClick={() => handleDelete(cat.id, cat.nameZh)}
-                          disabled={deletingId === cat.id || (cat._count?.recipes ?? 0) > 0}
-                          title={cat._count?.recipes > 0 ? '该分类下有菜谱，无法删除' : '删除分类'}
+                          disabled={deletingId === cat.id || (cat.recipeCount ?? 0) > 0}
+                          title={cat.recipeCount > 0 ? '该分类下有菜谱，无法删除' : '删除分类'}
                           className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                         >
                           {deletingId === cat.id ? (
