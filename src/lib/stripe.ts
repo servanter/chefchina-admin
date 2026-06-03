@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 // Stripe 配置（在构建时可能为空）
 export const stripe = process.env.STRIPE_SECRET_KEY
   ? new Stripe(process.env.STRIPE_SECRET_KEY, {
-      apiVersion: '2026-05-27.dahlia',
+      apiVersion: '2026-04-22.dahlia',
       typescript: true,
     })
   : null;
