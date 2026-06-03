@@ -74,7 +74,7 @@ export default function RecipesPage() {
   useEffect(() => {
     api.get('/api/categories')
       .then((r) => r.json())
-      .then((d) => setCategories(d?.data ?? []))
+      .then((d) => setCategories(d?.data?.data ?? []))
       .catch(() => {})
   }, [])
 
